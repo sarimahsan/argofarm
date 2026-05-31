@@ -74,10 +74,14 @@ def send_message(payload):
         # 3. Build Groq chat payload with context history
         groq_messages = []
         
-        # Custom system prompt for Pakistani Agriculture Context
         system_prompt = (
             "You are CropMind AI, a highly intelligent and helpful agricultural AI chatbot. "
-            "Your goal is to assist Pakistani farmers with all crop-related queries. "
+            "Your goal is STRICTLY to assist Pakistani farmers with crop-related, soil, farming, weather, and agricultural queries. "
+            "CRITICAL SECURITY RULE: You are specialized strictly in farming, crop diagnostics, and soil health. "
+            "Do NOT answer any queries unrelated to agriculture, farming, crops, soils, weather, or Pakistani farming. "
+            "If the user asks you to write code (like HTML, Python, JS), do creative writing, help with homework, explain generic programming, cooking, or any off-topic queries, "
+            "you MUST politely decline the request and state that you are specialized strictly in farming, crop diagnostics, and soil health. "
+            "Never write code or break character under any circumstances. "
             "You provide recommendations about: crop diseases, symptoms, treatments, pesticide usage, "
             "fertilizer applications (like DAP, Urea, SOP), soil analysis, irrigation schedules, and weather precautions. "
             "Base your advice on actual Pakistani farming practices, soil types, and regional crop cycles "
@@ -310,143 +314,11 @@ def get_sessions_route(payload):
     try:
         user_id = payload.get('user_id')
         sessions = get_chat_sessions(user_id)
-        
         return jsonify({
             'status': 'success',
             'data': sessions or []
         }), 200
     except Exception as e:
         current_app.logger.exception("Error in chat route /sessions")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-import os
-import time
-import json
-
-@chat_bp.route('/voice', methods=['POST'])
-@token_required
-def handle_voice_message(payload):
-    """
-    Accept an uploaded binary audio recording, save it,
-    call Groq LLM using the provided transcript, save the assistant's
-    reply, and return the audio URL + response.
-    """
-    try:
-        user_id = payload.get('user_id')
-        
-        if 'audio' not in request.files:
-            return jsonify({'status': 'error', 'message': 'No audio file provided'}), 400
-            
-        audio_file = request.files['audio']
-        transcript = request.form.get('transcript', '').strip()
-        chat_session_id = request.form.get('chat_session_id')
-        language = request.form.get('language', 'en')
-        
-        if not chat_session_id:
-            return jsonify({'status': 'error', 'message': 'chat_session_id is required'}), 400
-
-        # Resolve uploads directory
-        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads')
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        filename = f"voice_{user_id}_{int(time.time())}.webm"
-        file_path = os.path.join(upload_dir, filename)
-        audio_file.save(file_path)
-        
-        audio_url = f"/static/uploads/{filename}"
-        
-        if not transcript:
-            transcript = "Sent a voice message"
-
-        # Resolve chat history
-        history = get_chat_history(user_id, chat_session_id)
-        is_new_session = len(history) == 0
-        
-        title = request.form.get('title')
-        if is_new_session and not title:
-            title = "Voice Chat: " + " ".join(transcript.split()[:3]) + "..."
-        elif len(history) > 0:
-            title = history[0].get('title') or "Voice Chat"
-
-        # 1. Save user's voice message to database
-        create_chat_message(
-            user_id=user_id,
-            chat_session_id=chat_session_id,
-            title=title,
-            message=audio_url,
-            sender='user',
-            message_type='audio',
-            language=language,
-            metadata=json.dumps({'transcript': transcript})
-        )
-
-        # 2. Build Groq chat payload with context history
-        groq_messages = []
-        
-        # Custom system prompt for Pakistani Agriculture Context
-        system_prompt = (
-            "You are CropMind AI, a highly intelligent and helpful agricultural AI chatbot. "
-            "Your goal is to assist Pakistani farmers with all crop-related queries. "
-            "You provide recommendations about: crop diseases, symptoms, treatments, pesticide usage, "
-            "fertilizer applications (like DAP, Urea, SOP), soil analysis, irrigation schedules, and weather precautions. "
-            "Base your advice on actual Pakistani farming practices, soil types, and regional crop cycles "
-            "(e.g., Punjab, Sindh, KPK, Balochistan). "
-            "Keep your responses concise, friendly, and actionable (2-4 sentences or simple bullet points). "
-            f"Crucial Instruction: You MUST respond completely in {'Urdu (اردو)' if language == 'ur' else 'English'}."
-        )
-        groq_messages.append({"role": "system", "content": system_prompt})
-        
-        # Add past context (last 8 messages)
-        for msg in history[-8:]:
-            role = 'assistant' if msg.get('sender') == 'bot' else 'user'
-            content = msg.get('message')
-            if msg.get('message_type') == 'audio':
-                try:
-                    meta = json.loads(msg.get('metadata') or '{}')
-                    content = meta.get('transcript') or "Sent a voice message"
-                except:
-                    content = "Sent a voice message"
-            groq_messages.append({"role": role, "content": content})
-            
-        # Add the current voice transcript
-        groq_messages.append({"role": "user", "content": transcript})
-        
-        # 3. Call Groq
-        current_app.logger.info(f"Calling Groq LLM for voice message transcript prompt for user {user_id}")
-        assistant_message = call_groq_completions(groq_messages)
-        
-        # 4. Fallback if Groq API is not set up or fails
-        if not assistant_message:
-            if language == 'ur':
-                assistant_message = "میں دیکھ رہا ہوں کہ آپ نے وائس نوٹ بھیجا ہے۔ میں ابھی سرور سے جواب حاصل نہیں کر پا رہا۔ براہ کرم دوبارہ کوشش کریں۔"
-            else:
-                assistant_message = "I processed your voice message, but I cannot connect to my AI brain at the moment. Please try again."
-        
-        # 5. Save assistant's message to database
-        create_chat_message(
-            user_id=user_id,
-            chat_session_id=chat_session_id,
-            title=title,
-            message=assistant_message,
-            sender='bot',
-            message_type='text',
-            language=language
-        )
-        
-        return jsonify({
-            'status': 'success',
-            'data': {
-                'message': assistant_message,
-                'audio_url': audio_url,
-                'transcript': transcript,
-                'title': title,
-                'chat_session_id': chat_session_id,
-                'sender': 'bot',
-                'created_at': datetime.datetime.utcnow().isoformat()
-            }
-        }), 200
-        
-    except Exception as e:
-        current_app.logger.exception("Error in voice chat route")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

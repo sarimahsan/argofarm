@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ML Pipeline Verification Script
-Tests both the crop recommender and disease detection models.
+Tests the crop recommender model.
 Run this script to verify models are working correctly before deployment.
 
 Usage:
@@ -11,7 +11,6 @@ import os
 import sys
 import numpy as np
 from pathlib import Path
-from PIL import Image, ImageDraw
 import logging
 
 # Setup logging
@@ -28,10 +27,8 @@ sys.path.insert(0, str(backend_path))
 # Import after path is set
 from utils.ml_pipeline import (
     predict_crop,
-    predict_disease,
     check_models_available,
     load_crop_recommender,
-    load_disease_detector,
     verify_model_exists
 )
 
@@ -45,7 +42,6 @@ def test_model_files_exist():
     app_root = str(backend_path)
     models = {
         'crop_recommender': 'ai_models/crop_recommender_model.pkl',
-        'disease_detector': 'ai_models/plant_disease_final_model.h5'
     }
     
     all_exist = True
@@ -80,20 +76,6 @@ def test_model_loading():
             return False
     except Exception as e:
         logger.error(f"❌ Error loading crop recommender: {e}")
-        return False
-    
-    # Test disease detector
-    logger.info("\nLoading disease detector model...")
-    try:
-        model = load_disease_detector(app_root)
-        if model:
-            logger.info(f"✅ Disease detector loaded successfully")
-            logger.info(f"   Model type: {type(model).__name__}")
-        else:
-            logger.error("❌ Disease detector returned None")
-            return False
-    except Exception as e:
-        logger.error(f"❌ Error loading disease detector: {e}")
         return False
     
     return True
@@ -153,60 +135,10 @@ def test_crop_prediction():
     return all_passed
 
 
-def create_test_image(size=(224, 224)):
-    """Create a test image for disease detection"""
-    # Create a simple test image with some shapes
-    img = Image.new('RGB', size, color='green')
-    draw = ImageDraw.Draw(img)
-    
-    # Draw some patterns to simulate leaf features
-    draw.ellipse([50, 50, 100, 100], fill='darkgreen')
-    draw.ellipse([150, 80, 200, 130], fill='yellowgreen')
-    draw.line([100, 50, 150, 150], fill='brown', width=2)
-    
-    return np.array(img, dtype=np.float32) / 255.0
-
-
-def test_disease_prediction():
-    """Test 4: Test disease prediction with synthetic image"""
-    logger.info("\n" + "="*60)
-    logger.info("TEST 4: Testing disease prediction")
-    logger.info("="*60)
-    
-    app_root = str(backend_path)
-    
-    # Create a test image
-    logger.info("\nCreating test image...")
-    img_array = create_test_image(size=(224, 224))
-    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
-    
-    logger.info(f"Test image shape: {img_array.shape}")
-    logger.info(f"Test image dtype: {img_array.dtype}")
-    logger.info(f"Test image value range: [{img_array.min():.2f}, {img_array.max():.2f}]")
-    
-    try:
-        logger.info("\nRunning disease prediction...")
-        disease, confidence = predict_disease(img_array, app_root)
-        
-        if disease:
-            logger.info(f"✅ Prediction successful")
-            logger.info(f"   Disease: {disease}")
-            logger.info(f"   Confidence: {confidence:.2f}%")
-            return True
-        else:
-            logger.error("❌ Disease prediction returned None")
-            return False
-    except Exception as e:
-        logger.error(f"❌ Error during disease prediction: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
 def test_health_check():
-    """Test 5: Test health check endpoint"""
+    """Test 4: Test health check endpoint"""
     logger.info("\n" + "="*60)
-    logger.info("TEST 5: Testing health check")
+    logger.info("TEST 4: Testing health check")
     logger.info("="*60)
     
     app_root = str(backend_path)
@@ -256,7 +188,6 @@ def main():
         'Model files exist': test_model_files_exist(),
         'Model loading': test_model_loading(),
         'Crop prediction': test_crop_prediction(),
-        'Disease prediction': test_disease_prediction(),
         'Health check': test_health_check(),
     }
     

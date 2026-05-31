@@ -15,6 +15,7 @@ from routes.chat import chat_bp
 from routes.community import community_bp
 from routes.planner import planner_bp
 from routes.wholesale import wholesale_bp
+from routes.weather import weather_bp
 import logging
 import os
 
@@ -65,6 +66,7 @@ def create_app(config_name='development'):
     app.register_blueprint(community_bp)
     app.register_blueprint(planner_bp)
     app.register_blueprint(wholesale_bp)
+    app.register_blueprint(weather_bp)
     
     # ====== ROUTES ======
     @app.route('/', methods=['GET'])

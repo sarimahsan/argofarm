@@ -195,7 +195,7 @@ def test_chat_send_disease_intent(mock_create_msg, mock_groq, client, app):
     assert data['status'] == 'success'
     assert data['data']['action_trigger'] == 'trigger_image_upload'
 
-@patch('routes.chat.predict_best_crop')
+@patch('routes.chat.predict_crop')
 @patch('routes.chat.call_groq_completions')
 @patch('routes.chat.create_chat_message')
 def test_chat_recommend_crop_success(mock_create_msg, mock_groq, mock_predict, client, app):
@@ -219,51 +219,23 @@ def test_chat_recommend_crop_success(mock_create_msg, mock_groq, mock_predict, c
     assert data['data']['recommended_crop'] == 'maize'
     assert 'DAP and Urea' in data['data']['advisory']
 
-@patch('routes.chat.os.makedirs')
-@patch('routes.chat.call_groq_completions')
-@patch('routes.chat.create_chat_message')
-def test_chat_voice_message_upload(mock_create_msg, mock_groq, mock_makedirs, client, app):
-    """Test voice message recording upload with speech transcription"""
-    mock_groq.return_value = 'Here is your bilingual crop advice.'
-    
-    data = {
-        'audio': (BytesIO(b'fake_binary_audio_payload'), 'voice.webm'),
-        'transcript': 'کپاس کی فصل میں کھاد ڈالیں',
-        'chat_session_id': 'sess-voice',
-        'language': 'ur'
-    }
-    
-    headers = get_auth_headers(app)
-    # Perform multipart/form-data upload
-    with patch('builtins.open', MagicMock()):
-        response = client.post(
-            '/api/v1/chat/voice',
-            data=data,
-            content_type='multipart/form-data',
-            headers=headers
-        )
-        
-    assert response.status_code == 200
-    data_res = response.get_json()
-    assert data_res['status'] == 'success'
-    assert 'advisory' in data_res['data'] or 'message' in data_res['data']
+
 
 # ======================== SCAN ROUTES ========================
 
-@patch('routes.scan.get_model')
-@patch('routes.scan.preprocess_image')
-@patch('routes.scan.call_groq')
+@patch('routes.scan.call_gemini_vision')
 @patch('routes.scan.create_scan')
-def test_scan_disease_detect(mock_create_scan, mock_groq, mock_preprocess, mock_get_model, client, app):
+def test_scan_disease_detect(mock_create_scan, mock_gemini_vision, client, app):
     """Test crop leaf disease detection prediction uploader"""
-    import numpy as np
-    # Setup ML mock model returning a real numpy array with .ndim attribute
-    mock_model = MagicMock()
-    mock_model.predict.return_value = np.array([[0.0, 0.95, 0.05, 0.0, 0.0, 0.0, 0.0]]) # High confidence Yellow Rust
-    mock_get_model.return_value = mock_model
-    
-    mock_preprocess.return_value = 'preprocessed_img_array'
-    mock_groq.return_value = 'Professional advisory from Groq.'
+    import json
+    mock_gemini_vision.return_value = json.dumps({
+        "crop_type": "Wheat",
+        "disease": "Yellow Rust",
+        "confidence": 95,
+        "status": "Diseased",
+        "advisory_english": "Mock English advisory",
+        "advisory_urdu": "Mock Urdu advisory"
+    })
     mock_create_scan.return_value = 777
     
     headers = get_auth_headers(app)

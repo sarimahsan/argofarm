@@ -162,3 +162,146 @@ def get_offline_wholesale_fallback(title, category, price, location, description
             f"2. **Immediate Cash Settlement:** Offer immediate cash payment upon pick-up to request a **3% to 5%** cash discount on the total bulk price.\n"
             f"3. **Long-Term Contract Partnership:** Propose a repeat purchase agreement for subsequent crop harvests in exchange for customized volume pricing.\n"
         )
+
+
+# ======================== AI PRICE PREDICTION (Gemini 2.5 Flash) ========================
+
+from utils.gemini_client import call_gemini
+import json as _json
+
+PRICE_RATE_LIMITS = {}
+
+@wholesale_bp.route('/suggest-price', methods=['POST'])
+@token_required
+def suggest_price(payload):
+    """Use Gemini 2.5 Flash to suggest optimal wholesale pricing for a crop listing."""
+    try:
+        user_id = payload['user_id']
+        now = time.time()
+
+        # Rate limit cooldown
+        if user_id in PRICE_RATE_LIMITS:
+            last_req = PRICE_RATE_LIMITS[user_id]
+            if now - last_req < 10:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'AI Rate Limit: Please wait 10 seconds between price consultations.'
+                }), 429
+
+        PRICE_RATE_LIMITS[user_id] = now
+
+        data = request.get_json() or {}
+        crop_type = data.get('crop_type', 'Wheat')
+        category = data.get('category', 'Crops')
+        region = data.get('region', 'Punjab')
+        quantity = data.get('quantity', '1 Ton')
+        description = data.get('description', '')
+        lang = data.get('language', 'en')
+
+        logger.info(f"AI Price Suggestion for user {user_id}: {crop_type}, {region}, {quantity}, lang={lang}")
+
+        system_instruction = (
+            "You are 'AgroPrice AI', an elite Pakistani agricultural commodity pricing expert. "
+            "You have deep knowledge of wholesale mandi rates across Pakistan's major agricultural markets "
+            "(Lahore Badami Bagh, Karachi Super Highway Mandi, Faisalabad Grain Market, Multan Vehari Road Mandi, etc.).\n\n"
+            "Given a crop type, region, quantity, and optional description, provide a pricing recommendation.\n\n"
+            "IMPORTANT: Return ONLY a valid raw JSON object (no markdown, no backticks, no extra text) with these exact keys:\n"
+            "- \"suggested_price\": A string with the recommended price (e.g., 'Rs. 3,200/maund' or 'Rs. 85,000/ton')\n"
+            "- \"price_range_low\": A string with the lower end of fair market range\n"
+            "- \"price_range_high\": A string with the upper end of fair market range\n"
+            "- \"unit\": The pricing unit used (e.g., 'per maund', 'per ton', 'per kg')\n"
+            "- \"confidence\": A string rating: 'High', 'Medium', or 'Low'\n"
+            f"- \"reasoning\": A 2-3 sentence explanation of why this price is recommended, written in {'Urdu (اردو)' if lang == 'ur' else 'English'}\n"
+            f"- \"market_insight\": A 1-2 sentence current market trend insight, written in {'Urdu (اردو)' if lang == 'ur' else 'English'}"
+        )
+
+        prompt = (
+            f"Suggest the optimal wholesale listing price for:\n"
+            f"- Crop/Product: {crop_type}\n"
+            f"- Category: {category}\n"
+            f"- Region: {region}, Pakistan\n"
+            f"- Quantity: {quantity}\n"
+            f"- Additional Details: {description or 'None provided'}\n"
+            f"- Current Month: June 2025 (Kharif season)\n\n"
+            f"Return ONLY a JSON object with the pricing recommendation."
+        )
+
+        gemini_resp = call_gemini(prompt, system_instruction=system_instruction, temperature=0.3, max_tokens=600, json_mode=True)
+
+        parsed = None
+        if gemini_resp:
+            try:
+                # Strip any markdown wrapper
+                clean = gemini_resp.strip()
+                if clean.startswith("```json"):
+                    clean = clean[7:]
+                if clean.startswith("```"):
+                    clean = clean[3:]
+                if clean.endswith("```"):
+                    clean = clean[:-3]
+                clean = clean.strip()
+
+                parsed = _json.loads(clean)
+                logger.info(f"✅ Gemini price suggestion parsed: {parsed.get('suggested_price')}")
+            except Exception as parse_err:
+                logger.error(f"Failed to parse Gemini price JSON: {parse_err}. Raw: {gemini_resp[:300]}")
+
+        # Fallback if Gemini fails
+        if not parsed:
+            logger.warning("Gemini price suggestion failed — using offline fallback")
+            parsed = _get_price_fallback(crop_type, region, quantity, lang)
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Price suggestion generated successfully',
+            'data': {
+                'suggestion': parsed,
+                'inputs': {
+                    'crop_type': crop_type,
+                    'category': category,
+                    'region': region,
+                    'quantity': quantity,
+                }
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in price suggestion: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+def _get_price_fallback(crop_type, region, quantity, lang):
+    """Offline fallback pricing when Gemini is unavailable."""
+    is_ur = lang == 'ur'
+
+    # Basic price lookup table (PKR per maund, approximate 2025 rates)
+    price_table = {
+        'wheat': {'price': 'Rs. 3,900/maund', 'low': 'Rs. 3,600/maund', 'high': 'Rs. 4,200/maund'},
+        'rice': {'price': 'Rs. 7,500/maund', 'low': 'Rs. 6,800/maund', 'high': 'Rs. 8,200/maund'},
+        'cotton': {'price': 'Rs. 8,000/maund', 'low': 'Rs. 7,200/maund', 'high': 'Rs. 8,800/maund'},
+        'maize': {'price': 'Rs. 2,800/maund', 'low': 'Rs. 2,400/maund', 'high': 'Rs. 3,200/maund'},
+        'sugarcane': {'price': 'Rs. 350/maund', 'low': 'Rs. 300/maund', 'high': 'Rs. 400/maund'},
+        'potato': {'price': 'Rs. 1,800/maund', 'low': 'Rs. 1,400/maund', 'high': 'Rs. 2,200/maund'},
+        'tomato': {'price': 'Rs. 2,200/maund', 'low': 'Rs. 1,600/maund', 'high': 'Rs. 3,000/maund'},
+        'onion': {'price': 'Rs. 2,000/maund', 'low': 'Rs. 1,500/maund', 'high': 'Rs. 2,500/maund'},
+    }
+
+    crop_lower = crop_type.lower()
+    rates = price_table.get(crop_lower, {'price': 'Rs. 3,000/maund', 'low': 'Rs. 2,500/maund', 'high': 'Rs. 3,500/maund'})
+
+    if is_ur:
+        reasoning = f"{crop_type} کی موجودہ تھوک شرح {region} کی منڈی میں {rates['price']} کے قریب ہے۔ یہ تخمینہ حالیہ منڈی کے اعداد و شمار پر مبنی ہے۔"
+        market_insight = "اے آئی سروس عارضی طور پر دستیاب نہیں ہے۔ براہ کرم بعد میں مزید درست تجزیے کے لیے دوبارہ کوشش کریں۔"
+    else:
+        reasoning = f"Current wholesale rate for {crop_type} in {region} markets is approximately {rates['price']}. This estimate is based on recent market averages."
+        market_insight = "AI service temporarily unavailable. Please try again later for a more detailed market analysis."
+
+    return {
+        'suggested_price': rates['price'],
+        'price_range_low': rates['low'],
+        'price_range_high': rates['high'],
+        'unit': 'per maund',
+        'confidence': 'Medium',
+        'reasoning': reasoning,
+        'market_insight': market_insight,
+    }

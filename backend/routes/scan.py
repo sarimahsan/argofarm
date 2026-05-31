@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify, current_app
 
 from utils.auth_utils import token_required
 from models.queries import create_scan, create_chat_message
-from utils.groq_client import call_groq_completions
+from utils.gemini_client import call_gemini_vision
 
 logger = logging.getLogger(__name__)
 
@@ -16,9 +16,9 @@ scan_bp = Blueprint('scan', __name__, url_prefix='/api/v1/scan')
 @scan_bp.route('/predict', methods=['POST'])
 @token_required
 def predict(payload):
-    """Handle image upload, run Groq Vision model, save scan, and return B2B diagnosis result"""
+    """Handle image upload, run Gemini 2.5 Flash Vision model, save scan, and return B2B diagnosis result"""
     user_id = payload.get('user_id')
-    logger.info(f"=== Starting Groq Vision disease prediction for user {user_id} ===")
+    logger.info(f"=== Starting Gemini 2.5 Flash Vision disease prediction for user {user_id} ===")
 
     if 'image' not in request.files:
         logger.warning("No image file provided in request")
@@ -48,59 +48,46 @@ def predict(payload):
             wf.write(file_bytes)
         logger.info(f"✅ Image saved to: {file_path}")
 
-        # Base64 encode image stream for Groq Vision input
+        # Base64 encode image stream for Gemini Vision input
         base64_image = base64.b64encode(file_bytes).decode('utf-8')
 
-        # Ask Groq Llama 3.2 Vision model to classify
+        # System and user prompts for Gemini Vision
         system_prompt = (
-            "You are 'Dr. Crop AI', an eminent crop pathologist and plant surgeon in Pakistan.\n"
-            "Analyze the crop leaf image and identify any diseases present. Return ONLY a valid raw JSON object (do not wrap in backticks or markdown, no extra conversational text) with these exact keys:\n"
-            "- \"disease\": Specific disease name (e.g. 'Wheat Leaf Rust', 'Rice Blast', 'Potato Late Blight', or 'Healthy' if no pathology is found)\n"
+            "You are 'Dr. Crop AI', the chief crop pathologist and plant surgeon in Pakistan.\n"
+            "Analyze the crop leaf image and identify any diseases present. Return ONLY a valid JSON object.\n"
+            "CRITICAL: Keep both advisory fields highly structured but extremely concise so the JSON response does not exceed buffer limits. "
+            "All string values must escape newlines as '\\n'; do not use literal unescaped newlines.\n"
+            "The JSON object must have exactly these keys:\n"
+            "- \"crop_type\": The identified crop species (e.g., 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.)\n"
+            "- \"disease\": Specific disease name with Urdu transliteration in parentheses (e.g. 'Wheat Leaf Rust (پیلی کنگی)', 'Potato Late Blight (آلو کا پچھیتا جھلساؤ)', or 'Healthy (صحت مند)')\n"
             "- \"confidence\": A numeric confidence value between 0 and 100\n"
             "- \"status\": 'Healthy' if the leaf has no pathology, otherwise 'Diseased'\n"
-            "- \"advisory_english\": Actionable 2-3 sentences advisory in English outlining organic and chemical remedy recommendations.\n"
-            "- \"advisory_urdu\": Actionable 2-3 sentences advisory in Urdu Noto Nastaliq (اردو) text matching the English remedies."
+            "- \"advisory_english\": A concise, step-by-step crop-saving advisory in English formatted in clean markdown. "
+            "Provide exactly 2 brief bullet points or short sentences under the headers: **Symptoms**, **Organic Remedies**, **Chemical Remedies**, and **Prevention** (maximum 120 words total).\n"
+            "- \"advisory_urdu\": A matching, highly concise, step-by-step crop-saving advisory in Urdu matching the English remedies, also formatted in clean markdown (maximum 120 words total)."
         )
 
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            f"Analyze this image of '{crop_type}' crop leaf from '{region}' region. "
-                            f"Identify any leaf symptoms, spot patterns, or pathology. "
-                            f"Return ONLY a clean JSON object containing the disease, confidence percentage, status, advisory_english, and advisory_urdu."
-                        )
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
-                        }
-                    }
-                ]
-            },
-            {
-                "role": "system",
-                "content": system_prompt
-            }
-        ]
+        user_prompt = (
+            f"Analyze this image of '{crop_type}' crop leaf from '{region}' region.\n"
+            f"Identify the crop type, pathology symptoms, spot patterns, and diagnose any disease.\n"
+            f"Provide a highly concise, professional, step-by-step rescue plan to save the crop (max 120 words per language).\n"
+            f"Return ONLY a clean JSON object following the schema outlined in the system instruction."
+        )
 
-        logger.info("Dispatching image to Groq Llama 3.2 Vision API...")
-        groq_resp = call_groq_completions(
-            messages,
-            model_name="llama-3.2-11b-vision-preview",
-            temperature=0.1,
-            max_tokens=800
+        logger.info("Dispatching image to Gemini 2.5 Flash Vision API...")
+        gemini_resp = call_gemini_vision(
+            prompt=user_prompt,
+            base64_image=base64_image,
+            system_instruction=system_prompt,
+            temperature=0.15,
+            json_mode=True
         )
 
         parsed = None
-        if groq_resp:
+        if gemini_resp:
             try:
                 # Strip potential markdown wrapper blocks
-                clean_resp = groq_resp.strip()
+                clean_resp = gemini_resp.strip()
                 if clean_resp.startswith("```json"):
                     clean_resp = clean_resp[7:]
                 if clean_resp.startswith("```"):
@@ -110,19 +97,26 @@ def predict(payload):
                 clean_resp = clean_resp.strip()
 
                 parsed = json.loads(clean_resp)
+                detected_crop = parsed.get("crop_type", crop_type)
+                
+                # Update crop_type if it was Unknown or not provided
+                if crop_type == 'Unknown' or not crop_type:
+                    if detected_crop and detected_crop.lower() != 'unknown':
+                        crop_type = detected_crop
+
                 disease = parsed.get("disease", "Unknown")
                 confidence = float(parsed.get("confidence", 85.0))
                 status = parsed.get("status", "Diseased")
                 advisory_en = parsed.get("advisory_english", "Pathology detected. Consult expert.")
                 advisory_ur = parsed.get("advisory_urdu", "بیماری دیکھی گئی۔ ماہر سے رجوع کریں۔")
-                logger.info(f"✅ Groq Vision successfully classified: {disease} ({confidence}%)")
+                logger.info(f"✅ Gemini Vision successfully classified: {disease} for crop: {crop_type} ({confidence}%)")
             except Exception as parse_error:
-                logger.error(f"Failed to parse JSON from Groq Vision: {parse_error}. Raw response: {groq_resp}")
+                logger.error(f"Failed to parse JSON from Gemini Vision: {parse_error}. Raw response: {gemini_resp}")
                 parsed = None
 
-        # Robust agronomist diagnostic fallback if Groq Vision fails
+        # Robust agronomist diagnostic fallback if Gemini Vision fails
         if not parsed:
-            logger.warning("Groq Vision or JSON parsing failed. Executing offline python B2B agronomist fallback...")
+            logger.warning("Gemini Vision or JSON parsing failed. Executing offline python B2B agronomist fallback...")
             confidence = 75.0
             status = 'Diseased'
             if crop_type.lower() == 'wheat':
