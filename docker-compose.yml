@@ -15,10 +15,10 @@ services:
       - argofarm-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 10s
-      retries: 20
-      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
     restart: unless-stopped
 
   backend:
@@ -40,8 +40,7 @@ services:
     networks:
       - argofarm-network
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     restart: unless-stopped
 
   frontend:
