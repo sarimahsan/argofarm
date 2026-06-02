@@ -37,6 +37,9 @@ services:
       JWT_SECRET: your-secret-key-change-in-production
     ports:
       - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/.env
     networks:
       - argofarm-network
     depends_on:
