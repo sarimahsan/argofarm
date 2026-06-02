@@ -38,10 +38,6 @@ export function renderSidebar(container) {
         <i class="fas fa-truck-ramp-box"></i>
         <span class="sidebar-btn-text">${isUr ? 'تھوک بازار' : 'Wholesale'}</span>
       </button>
-      <button class="sidebar-btn" data-page="chat" type="button" title="${isUr ? 'کراپ مائنڈ' : 'CropMind Chat'}" aria-label="${isUr ? 'کراپ مائنڈ' : 'CropMind Chat'}">
-        <i class="fas fa-comment-dots"></i>
-        <span class="sidebar-btn-text">${isUr ? 'کراپ مائنڈ' : 'CropMind'}</span>
-      </button>
       <button class="sidebar-btn" data-page="community" type="button" title="${isUr ? 'برادری' : 'Community & Marketplace'}" aria-label="${isUr ? 'برادری' : 'Community & Marketplace'}">
         <i class="fas fa-people-roof"></i>
         <span class="sidebar-btn-text">${isUr ? 'برادری' : 'Community'}</span>
@@ -71,7 +67,11 @@ export function renderSidebar(container) {
 
   nav.querySelectorAll('.sidebar-btn[data-page]').forEach(btn => {
     btn.addEventListener('click', () => {
-      navigate(btn.dataset.page);
+      if (btn.dataset.page === 'chat') {
+        window.__toggleCopilot && window.__toggleCopilot();
+      } else {
+        navigate(btn.dataset.page);
+      }
       closeMobileMenu();
     });
   });

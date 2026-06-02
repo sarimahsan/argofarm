@@ -15,7 +15,7 @@ import { mountWholesale } from './pages/wholesale.js';
 import { renderSidebar } from './components/sidebar.js';
 import { openModal } from './components/modal.js';
 import { apiGetScan } from './api.js';
-import { showToast, formatDate } from './utils.js';
+import { showToast, formatDate, parseMarkdown } from './utils.js';
 
 // Initialize state from localstorage
 initState();
@@ -25,6 +25,11 @@ const appEl = document.getElementById('app');
 appEl.innerHTML = `
   <div class="app-sidebar" id="appSidebar" style="display: none;"></div>
   <div class="app-content" id="appContent"></div>
+  <div class="copilot-drawer" id="copilotDrawer"></div>
+  <button class="copilot-trigger-fab" id="copilotTriggerFab" title="Ask CropMind AI" style="display: none;">
+    <i class="fas fa-robot"></i>
+    <span class="pulse-dot" style="position:absolute;top:2px;right:2px;width:8px;height:8px;border:2px solid var(--bg);animation:pulse 2s infinite;"></span>
+  </button>
 `;
 
 const sidebarContainer = document.getElementById('appSidebar');
@@ -32,13 +37,44 @@ const contentContainer = document.getElementById('appContent');
 
 // Render layout elements once
 let sidebarRendered = null;
+let copilotInitialized = false;
+
+// Global toggle logic
+window.__openCopilot = function() {
+  const drawer = document.getElementById('copilotDrawer');
+  const fab = document.getElementById('copilotTriggerFab');
+  if (drawer) drawer.classList.add('active');
+  if (fab) fab.classList.add('active');
+};
+
+window.__closeCopilot = function() {
+  const drawer = document.getElementById('copilotDrawer');
+  const fab = document.getElementById('copilotTriggerFab');
+  if (drawer) drawer.classList.remove('active');
+  if (fab) fab.classList.remove('active');
+};
+
+window.__toggleCopilot = function() {
+  const drawer = document.getElementById('copilotDrawer');
+  const fab = document.getElementById('copilotTriggerFab');
+  if (drawer) {
+    const isActive = drawer.classList.toggle('active');
+    if (fab) fab.classList.toggle('active', isActive);
+  }
+};
+
+document.getElementById('copilotTriggerFab').addEventListener('click', () => {
+  window.__toggleCopilot();
+});
 
 function updateLayout(state) {
   const { authToken, currentPage } = state;
   const isAuthPage = currentPage === 'landing';
+  const fab = document.getElementById('copilotTriggerFab');
   
   if (authToken && !isAuthPage) {
     sidebarContainer.style.display = 'block';
+    if (fab) fab.style.display = 'flex';
     if (!sidebarRendered) {
       sidebarRendered = renderSidebar(sidebarContainer);
     } else {
@@ -49,16 +85,45 @@ function updateLayout(state) {
     }
   } else {
     sidebarContainer.style.display = 'none';
+    if (fab) {
+      fab.style.display = 'none';
+      fab.classList.remove('active');
+    }
+    const drawer = document.getElementById('copilotDrawer');
+    if (drawer) drawer.classList.remove('active');
   }
 }
 
-// Watch state changes to dynamically hide/show sidebar
+async function handleCopilotInitialization(state) {
+  const { authToken } = state;
+  const drawer = document.getElementById('copilotDrawer');
+  if (authToken && drawer && !copilotInitialized) {
+    copilotInitialized = true;
+    await mountChat(drawer);
+  } else if (!authToken) {
+    copilotInitialized = false;
+    if (drawer) drawer.innerHTML = '';
+  }
+}
+
+// Watch state changes to dynamically hide/show sidebar and initialize/refresh copilot
 onStateChange(updateLayout);
+onStateChange(handleCopilotInitialization);
 
 // Register Pages to router
 registerRoute('landing', mountLanding);
 registerRoute('dashboard', mountDashboard);
-registerRoute('chat', mountChat);
+registerRoute('chat', async (pageEl) => {
+  // Opening the copilot drawer automatically
+  window.__openCopilot && window.__openCopilot();
+  
+  // Redirect to previous page or dashboard so a page context remains underneath
+  const state = getState();
+  const prevPage = state.currentPage && state.currentPage !== 'chat' ? state.currentPage : 'dashboard';
+  setTimeout(() => {
+    navigate(prevPage);
+  }, 100);
+});
 registerRoute('history', mountHistory);
 registerRoute('settings', mountSettings);
 registerRoute('calendar', mountCalendar);
@@ -100,18 +165,14 @@ window.__openScanModal = async function(id) {
 
   const contentHTML = `
     ${scanImgHtml}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(135px, 1fr));gap:16px;margin-bottom:20px;">
       <div style="background:var(--bg-input);padding:14px;border-radius:var(--radius-md);border:1px solid var(--border);">
         <div style="font-size:11px;text-transform:uppercase;color:var(--fg-muted);margin-bottom:6px;">${isUr ? 'صورتحال' : 'Status'}</div>
         <span class="badge ${statusClass}">${d.status}</span>
       </div>
       <div style="background:var(--bg-input);padding:14px;border-radius:var(--radius-md);border:1px solid var(--border);">
-        <div style="font-size:11px;text-transform:uppercase;color:var(--fg-muted);margin-bottom:6px;">${isUr ? 'اعتماد' : 'Confidence'}</div>
-        <div style="font-size:20px;font-weight:700;">${d.confidence || 0}%</div>
-      </div>
-      <div style="background:var(--bg-input);padding:14px;border-radius:var(--radius-md);border:1px solid var(--border);">
         <div style="font-size:11px;text-transform:uppercase;color:var(--fg-muted);margin-bottom:6px;">${isUr ? 'بیماری' : 'Disease'}</div>
-        <div style="font-weight:600;color:var(--danger);">${d.disease}</div>
+        <div style="font-weight:600;color:var(--danger);font-size:14px;">${d.disease}</div>
       </div>
       <div style="background:var(--bg-input);padding:14px;border-radius:var(--radius-md);border:1px solid var(--border);">
         <div style="font-size:11px;text-transform:uppercase;color:var(--fg-muted);margin-bottom:6px;">${isUr ? 'علاقہ' : 'Region'}</div>
@@ -119,12 +180,16 @@ window.__openScanModal = async function(id) {
       </div>
     </div>
     <div style="margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--accent);">Advisory (English)</div>
-      <div style="background:var(--bg-input);padding:16px;border-radius:10px;font-size:13px;line-height:1.8;color:var(--fg);border:1px solid var(--border);">${d.advisory_english || 'No English advisory available'}</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--accent);display:flex;align-items:center;gap:6px;">
+        <i class="fas fa-prescription-bottle-medical"></i> Advisory (English)
+      </div>
+      <div style="background:var(--bg-input);padding:16px;border-radius:10px;font-size:13px;line-height:1.7;color:var(--fg);border:1px solid var(--border);">${d.advisory_english ? parseMarkdown(d.advisory_english) : 'No English advisory available'}</div>
     </div>
     <div style="margin-bottom:20px;">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--accent);">مشورہ (اردو)</div>
-      <div class="urdu-text" style="background:var(--bg-input);padding:16px;border-radius:10px;font-size:14px;line-height:2.2;color:var(--fg);border:1px solid var(--border);">${d.advisory_urdu || 'کوئی اردو مشورہ دستیاب نہیں ہے'}</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--accent);display:flex;align-items:center;gap:6px;">
+        <i class="fas fa-prescription-bottle-medical"></i> مشورہ (اردو)
+      </div>
+      <div class="urdu-text" style="background:var(--bg-input);padding:16px;border-radius:10px;font-size:14px;line-height:2.0;color:var(--fg);border:1px solid var(--border);">${d.advisory_urdu ? parseMarkdown(d.advisory_urdu) : 'کوئی اردو مشورہ دستیاب نہیں ہے'}</div>
     </div>
     <button class="btn btn-accent" style="width:100%;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;" id="modalDownloadReportBtn">
       <i class="fas fa-file-pdf"></i> ${isUr ? 'پی ڈی ایف رپورٹ ڈاؤن لوڈ کریں' : 'Download PDF Report'}
@@ -191,8 +256,8 @@ window.__openScanModal = async function(id) {
               </div>
 
               <div>
-                <div style="font-size:10px; text-transform:uppercase; color:#9ca3af; font-weight:700; letter-spacing:0.5px;">ANALYSIS CONFIDENCE</div>
-                <div style="font-size:24px; font-weight:800; color:#111827; margin-top:2px;">${d.confidence || 0}%</div>
+                <div style="font-size:10px; text-transform:uppercase; color:#9ca3af; font-weight:700; letter-spacing:0.5px;">SAMPLE REGION</div>
+                <div style="font-size:16px; font-weight:700; color:#111827; margin-top:2px;">${d.region || 'Punjab'}</div>
               </div>
             </div>
 
@@ -261,3 +326,4 @@ initRouter();
 
 // Initial layout rendering
 updateLayout(getState());
+

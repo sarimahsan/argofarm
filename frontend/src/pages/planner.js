@@ -15,10 +15,10 @@ export async function mountPlanner(container) {
 
   // Translate page strings
   const strings = {
-    title: isUr ? 'اے آئی فصل کا منصوبہ کار' : 'AI Crop Planner',
+    title: isUr ? 'کراپ مائنڈ AI — فصل کا منصوبہ کار' : 'CropMind AI — Timeline Planner',
     subtitle: isUr 
       ? 'اپنے بجٹ، زمین کے رقبے اور پانی کی دستیابی کے مطابق 4 ماہ کا زراعتی منصوبہ حاصل کریں' 
-      : 'Generate a highly customized, 4-month agricultural timeline tailored to your budget, acreage, and water availability.',
+      : 'Generate a highly customized, 4-month agricultural timeline tailored to your budget, acreage, and water availability using CropMind AI.',
     labelLand: isUr ? 'زمین کا رقبہ (ایکڑ)' : 'Land Size (Acres)',
     placeholderLand: 'e.g. 5',
     labelBudget: isUr ? 'کل بجٹ (روپے)' : 'Total Budget (PKR)',
@@ -203,6 +203,20 @@ export async function mountPlanner(container) {
       display.innerHTML = renderPlanOutput(plan);
       bindExportPdfListener();
       showToast(isUr ? 'نیا زراعتی منصوبہ کامیابی سے تیار ہو گیا ہے' : 'AI Crop Plan updated!');
+
+      // Slide open the Copilot drawer and preload agronomist follow-up pricing query
+      setTimeout(() => {
+        if (window.__openCopilot) {
+          window.__openCopilot();
+          const chatInput = document.getElementById('chatInput');
+          if (chatInput) {
+            chatInput.value = isUr
+              ? `میں نے ${crop} کا نیا 4 ماہ کا شیڈول (رقبہ: ${landSize} ایکڑ، بجٹ: ${budget} روپے) تیار کیا ہے۔ اس منصوبہ کو حاصل کرنے کے لیے کھاد کا تفصیلی شیڈول کیا ہونا چاہیے؟`
+              : `I have generated a new 4-month timeline plan for my ${crop} crop (${landSize} Acres, Budget: PKR ${budget}). Tell me how I should distribute my fertilizer timeline.`;
+            chatInput.focus();
+          }
+        }
+      }, 1500);
     } else {
       // Revert placeholder
       display.innerHTML = renderInitialPlaceholder();
@@ -482,7 +496,7 @@ export async function mountPlanner(container) {
 
         <div class="header">
           <div class="header-title">
-            <h1>${isUr ? 'اے آئی فصل کا منصوبہ کار — آرگوفارم' : 'AI Crop Planner — ArgoFarm'}</h1>
+            <h1>${isUr ? 'کراپ مائنڈ AI — فصل کا منصوبہ کار' : 'CropMind AI — Timeline Planner'}</h1>
             <p>${isUr ? 'بجٹ، زمین اور پانی کے وسائل کے مطابق تیار کردہ منصوبہ' : 'Customized Agronomist Schedule & Recommendations'}</p>
           </div>
           <div class="brand-logo">🌾</div>

@@ -157,25 +157,6 @@ export async function apiScanImage(formData) {
   }
 }
 
-export async function apiSendVoice(formData) {
-  const { authToken } = getState();
-  const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-
-  try {
-    const response = await fetch(`${API_BASE}/chat/voice`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-
-    return await response.json();
-  } catch (err) {
-    console.error('Voice error:', err);
-    showToast('Voice message failed.');
-    return null;
-  }
-}
-
 // ====== COMMUNITY & MARKETPLACE ENDPOINTS ======
 export async function apiGetCommunityPosts() {
   return apiFetch('/community/posts');
@@ -252,3 +233,22 @@ export async function apiAnalyzeWholesaleDeal(itemId, language = 'en') {
     body: JSON.stringify({ item_id: itemId, language }),
   });
 }
+
+// ====== AI WEATHER ADVISORY (Gemini 2.5 Flash + Open-Meteo) ======
+export async function apiGetWeatherAdvisory(lang = 'en') {
+  return apiFetch(`/weather/advisory?lang=${lang}`);
+}
+
+// ====== AI PRICE PREDICTION (Gemini 2.5 Flash) ======
+export async function apiSuggestPrice(data) {
+  return apiFetch('/wholesale/suggest-price', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+// ====== AI OUTBREAK FORECASTING (Gemini 2.5 Flash + GIS Heatmap) ======
+export async function apiGetOutbreakForecast() {
+  return apiFetch('/dashboard/forecast');
+}
+

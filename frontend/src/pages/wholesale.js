@@ -3,7 +3,7 @@
 import { getState } from '../state.js';
 import { showToast, formatDate } from '../utils.js';
 import { renderMobileHeader } from '../components/sidebar.js';
-import { apiGetMarketplace, apiAnalyzeWholesaleDeal } from '../api.js';
+import { apiGetMarketplace, apiAnalyzeWholesaleDeal, apiSuggestPrice } from '../api.js';
 
 export async function mountWholesale(container) {
   container.innerHTML = '';
@@ -15,16 +15,16 @@ export async function mountWholesale(container) {
 
   // Localized dictionary keys
   const strings = {
-    title: isUr ? 'تھوک بازار اور اے آئی ڈیل مائنڈ' : 'Wholesale Bazaar & B2B DealMind',
+    title: isUr ? 'تھوک بازار اور کراپ مائنڈ AI' : 'Wholesale Bazaar & CropMind AI',
     subtitle: isUr 
-      ? 'مقامی کسانوں کی تیار فصلیں بلک ہول سیل ریٹس پر خریدیں، قیمت کا اے آئی تجزیہ کریں اور براہِ راست رابطہ کریں' 
-      : 'Browse bulk agricultural crops listed directly by local farmers, evaluate prices using AI DealMind, and secure wholesale trades.',
+      ? 'مقامی کسانوں کی تیار فصلیں بلک ہول سیل ریٹس پر خریدیں، قیمت کا کراپ مائنڈ AI سے تجزیہ کریں' 
+      : 'Browse bulk agricultural crops listed directly by local farmers, evaluate deals using CropMind AI, and secure wholesale trades.',
     loadingList: isUr ? 'فصلوں کی لسٹنگ لوڈ ہو رہی ہے...' : 'Loading wholesale listings...',
     noListings: isUr ? 'اس وقت بازار میں کوئی فصل دستیاب نہیں ہے' : 'No bulk crop listings found in the bazaar currently.',
     whatsappContact: isUr ? 'واٹس ایپ پر رابطہ کریں' : 'Order via WhatsApp',
-    aiAnalyze: isUr ? 'اے آئی ڈیل ایڈوائزر' : 'AI Deal Advisor',
-    analyzing: isUr ? 'اے آئی ڈیل مائنڈ جائزہ لے رہا ہے...' : 'DealMind is analyzing...',
-    modalTitle: isUr ? 'اے آئی ڈیل مائنڈ رپورٹ' : 'AI DealMind B2B Assessment',
+    aiAnalyze: isUr ? 'کراپ مائنڈ ڈیل ایویلیوایٹر' : 'CropMind AI Deal Evaluator',
+    analyzing: isUr ? 'کراپ مائنڈ ڈیل ایویلیوایٹر جائزہ لے رہا ہے...' : 'CropMind AI is evaluating...',
+    modalTitle: isUr ? 'کراپ مائنڈ AI رپورٹ' : 'CropMind AI B2B Assessment',
     locationTag: isUr ? 'جگہ:' : 'Location:',
     sellerTag: isUr ? 'بیچنے والا:' : 'Seller:',
     priceTag: isUr ? 'ہول سیل ریٹ:' : 'Wholesale Price:'
@@ -110,7 +110,71 @@ export async function mountWholesale(container) {
         </p>
       </div>
 
-      <div id="wholesaleGridContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:24px;">
+      <!-- AI Price Advisor Panel -->
+      <div class="card" style="margin-bottom:32px;padding:24px;border:1px solid var(--border);position:relative;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, rgba(46,204,64,0.15), rgba(59,130,246,0.15));display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-tags" style="color:var(--accent);font-size:16px;"></i>
+          </div>
+          <div>
+            <h3 style="font-size:16px;font-weight:800;color:var(--fg);margin:0;" class="${isUr ? 'urdu-text' : ''}">
+              ${isUr ? '🤖 کراپ مائنڈ AI — پرائس ایڈوائزر' : '🤖 CropMind AI — Price Advisor'}
+            </h3>
+            <p style="font-size:11px;color:var(--fg-muted);margin:2px 0 0;" class="${isUr ? 'urdu-text' : ''}">
+              ${isUr ? 'فصل کی قسم درج کریں اور کراپ مائنڈ AI سے ہول سیل قیمت حاصل کریں' : 'Enter your crop details and get CropMind AI-powered wholesale pricing suggestions'}
+            </p>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:14px;align-items:end;" id="priceAdvisorForm">
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;display:block;margin-bottom:4px;">${isUr ? 'فصل کی قسم' : 'Crop Type'}</label>
+            <select id="paCrop" class="form-input" style="padding:10px 12px;font-size:13px;height:42px;">
+              <option value="Wheat">${isUr ? 'گندم' : 'Wheat'}</option>
+              <option value="Rice">${isUr ? 'چاول' : 'Rice'}</option>
+              <option value="Cotton">${isUr ? 'کپاس' : 'Cotton'}</option>
+              <option value="Maize">${isUr ? 'مکئی' : 'Maize'}</option>
+              <option value="Sugarcane">${isUr ? 'گنا' : 'Sugarcane'}</option>
+              <option value="Potato">${isUr ? 'آلو' : 'Potato'}</option>
+              <option value="Tomato">${isUr ? 'ٹماٹر' : 'Tomato'}</option>
+              <option value="Onion">${isUr ? 'پیاز' : 'Onion'}</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;display:block;margin-bottom:4px;">${isUr ? 'علاقہ' : 'Region'}</label>
+            <select id="paRegion" class="form-input" style="padding:10px 12px;font-size:13px;height:42px;">
+              <option value="Lahore">Lahore</option>
+              <option value="Faisalabad">Faisalabad</option>
+              <option value="Multan">Multan</option>
+              <option value="Karachi">Karachi</option>
+              <option value="Peshawar">Peshawar</option>
+              <option value="Islamabad">Islamabad</option>
+              <option value="Hyderabad">Hyderabad</option>
+              <option value="Quetta">Quetta</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;display:block;margin-bottom:4px;">${isUr ? 'مقدار' : 'Quantity'}</label>
+            <input id="paQuantity" class="form-input" type="text" value="1 Ton" style="padding:10px 12px;font-size:13px;height:42px;" />
+          </div>
+          <button class="btn btn-accent" id="priceAdvisorBtn" type="button" style="padding:10px 20px;height:42px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;width:100%;">
+            <i class="fas fa-wand-magic-sparkles"></i> ${isUr ? 'قیمت تجویز کریں' : 'Suggest Price'}
+          </button>
+        </div>
+
+        <div id="priceAdvisorResult" style="display:none;margin-top:20px;"></div>
+      </div>
+
+      <div style="margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+        <h2 style="font-size:16px; font-weight:700; margin:0;" class="${isUr ? 'urdu-text' : ''}">
+          ${isUr ? 'دستیاب ہول سیل لسٹنگز' : 'Available Wholesale Listings'}
+        </h2>
+        <span style="font-size:11px; color:var(--fg-muted); background:var(--bg-input); padding:4px 8px; border-radius:6px; border:1px solid var(--border); font-weight:600; display:inline-block;">
+          ${isUr ? 'براہِ راست کسان سے' : 'Direct From Farmer'}
+        </span>
+      </div>
+
+      <div id="wholesaleGridContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:24px;margin-bottom:40px;">
         <div style="text-align:center;grid-column:1/-1;padding:50px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i><div style="margin-top:10px;font-size:12px;color:var(--fg-muted);">${strings.loadingList}</div></div>
       </div>
 
@@ -147,16 +211,14 @@ export async function mountWholesale(container) {
           <p style="font-size:12px;max-width:280px;line-height:1.6;margin:0 auto;">${strings.noListings}</p>
         </div>
       `;
-      return;
-    }
-
-    grid.innerHTML = crops.map(item => {
-      const img = item.image_url || 'https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?w=400';
-      const cleanPhone = item.phone.replace(/[^0-9]/g, '') || '923000000000';
-      
-      // WhatsApp prefilled B2B order text
-      const waMsg = isUr
-        ? `السلام علیکم ${item.seller_name}، میں ایک تھوک خریدار (Wholesale Buyer) ہوں۔ میں نے آرگوفارم پر آپ کی فصل کی ہول سیل لسٹنگ '${item.title}' دیکھی ہے جس کا ریٹ ${item.price} ہے۔ میں اس سودے میں دلچسپی رکھتا ہوں اور سپلائی اور لاجسٹکس کے حوالے سے تفصیلی بات چیت کرنا چاہتا ہوں۔`
+    } else {
+      grid.innerHTML = crops.map(item => {
+        const img = item.image_url || 'https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?w=400';
+        const cleanPhone = item.phone.replace(/[^0-9]/g, '') || '923000000000';
+        
+        // WhatsApp prefilled B2B order text
+        const waMsg = isUr
+          ? `السلام علیکم ${item.seller_name}، میں ایک تھوک خریدار (Wholesale Buyer) ہو۔ میں نے آرگوفارم پر آپ کی فصل کی ہول سیل لسٹنگ '${item.title}' دیکھی ہے جس کا ریٹ ${item.price} ہے۔ میں اس سودے میں دلچسپی رکھتا ہوں اور سپلائی اور لاجسٹکس کے حوالے سے تفصیلی بات چیت کرنا چاہتا ہو۔`
         : `Assalam-o-Alaikum ${item.seller_name}, I am a wholesale bulk buyer. I saw your listing for '${item.title}' at ${item.price} on ArgoFarm. I am highly interested in buying wholesale volume and would like to discuss transport logistics and grading details.`;
       
       const waLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waMsg)}`;
@@ -184,7 +246,7 @@ export async function mountWholesale(container) {
               </div>
 
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <button class="btn btn-sm btn-outline btn-ai-evaluate" style="width:100%;padding:9px;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;border-color:var(--accent);color:var(--accent);" type="button">
+                <button class="btn btn-sm btn-outline btn-ai-evaluate" style="width:100%;padding:9px;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;border-color:var(--accent);color:var(--accent);" type="button" title="${strings.aiAnalyze}">
                   <i class="fas fa-brain"></i> ${strings.aiAnalyze}
                 </button>
                 <a href="${waLink}" target="_blank" class="btn btn-sm btn-accent" style="width:100%;padding:9px;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;">
@@ -205,14 +267,131 @@ export async function mountWholesale(container) {
 
       const evalBtn = card.querySelector('.btn-ai-evaluate');
       evalBtn.addEventListener('click', () => {
-        handleAIDealAnalysis(item, modal, modalBody);
+        if (window.__assessWholesaleDealInCopilot) {
+          window.__assessWholesaleDealInCopilot(item);
+        } else {
+          handleAIDealAnalysis(item, modal, modalBody);
+        }
       });
     });
   }
 
-  await render();
+  // AI Price Advisor listener
+  const paBtn = main.querySelector('#priceAdvisorBtn');
+  const paResult = main.querySelector('#priceAdvisorResult');
+  if (paBtn && paResult) {
+    paBtn.addEventListener('click', async () => {
+      const crop = main.querySelector('#paCrop').value;
+      const region = main.querySelector('#paRegion').value;
+      const quantity = main.querySelector('#paQuantity').value || '1 Ton';
 
-  return () => {
-    container.classList.remove('wholesale-page');
-  };
+      paBtn.disabled = true;
+      paBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${isUr ? 'تجزیہ جاری ہے...' : 'Analyzing...'}`;
+      paResult.style.display = 'block';
+      paResult.innerHTML = `
+        <div style="text-align:center;padding:24px;">
+          <i class="fas fa-brain fa-2x" style="color:var(--accent);animation:pulse 1.5s infinite;"></i>
+          <p style="font-size:12px;color:var(--fg-muted);margin-top:10px;">${isUr ? 'جیمنی اے آئی پاکستانی منڈی کا تجزیہ کر رہا ہے...' : 'Gemini AI is analyzing Pakistani mandi rates...'}</p>
+        </div>
+      `;
+
+      const res = await apiSuggestPrice({
+        crop_type: crop,
+        region: region,
+        quantity: quantity,
+        language: currentLang,
+      });
+
+      paBtn.disabled = false;
+      paBtn.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${isUr ? 'قیمت تجویز کریں' : 'Suggest Price'}`;
+
+      if (res && res.status === 'success' && res.data && res.data.suggestion) {
+        const s = res.data.suggestion;
+        const confColor = s.confidence === 'High' ? 'var(--accent)' : s.confidence === 'Medium' ? 'var(--warning)' : 'var(--fg-muted)';
+        const confBadge = s.confidence === 'High' ? 'badge-green' : s.confidence === 'Medium' ? 'badge-yellow' : 'badge-red';
+
+        paResult.innerHTML = `
+          <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;background:rgba(46,204,64,0.03);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+              <div>
+                <div style="font-size:11px;color:var(--fg-muted);text-transform:uppercase;font-weight:600;margin-bottom:4px;">${isUr ? 'تجویز کردہ قیمت' : 'Suggested Price'}</div>
+                <div style="font-size:28px;font-weight:900;color:var(--accent);letter-spacing:-0.5px;">${s.suggested_price || '--'}</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge ${confBadge}" style="font-size:10px;padding:4px 10px;">
+                  <i class="fas fa-signal"></i> ${isUr ? 'اعتماد:' : 'Confidence:'} ${s.confidence || 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            <!-- Price Range Bar -->
+            <div style="margin-bottom:16px;">
+              <div style="font-size:10px;color:var(--fg-muted);text-transform:uppercase;font-weight:600;margin-bottom:8px;">${isUr ? 'منڈی کی قیمت کی حد' : 'Market Price Range'}</div>
+              <div style="position:relative;height:8px;background:var(--bg-input);border-radius:4px;overflow:hidden;">
+                <div style="position:absolute;left:10%;right:10%;top:0;bottom:0;background:linear-gradient(90deg, #ef4444, #f59e0b, #2ecc40);border-radius:4px;opacity:0.7;"></div>
+                <div style="position:absolute;left:45%;top:-4px;bottom:-4px;width:4px;background:var(--fg);border-radius:2px;box-shadow:0 0 6px rgba(0,0,0,0.3);"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;">
+                <span style="color:var(--danger);font-weight:600;">${s.price_range_low || '--'}</span>
+                <span style="color:var(--accent);font-weight:700;font-size:12px;">▲ ${isUr ? 'تجویز' : 'Suggested'}</span>
+                <span style="color:var(--fg-muted);font-weight:600;">${s.price_range_high || '--'}</span>
+              </div>
+            </div>
+
+            <!-- Reasoning -->
+            <div style="border-top:1px dashed var(--border);padding-top:12px;margin-bottom:10px;">
+              <div style="display:flex;align-items:flex-start;gap:8px;">
+                <i class="fas fa-lightbulb" style="color:var(--warning);margin-top:3px;flex-shrink:0;"></i>
+                <p class="${isUr ? 'urdu-text' : ''}" style="font-size:12px;color:var(--fg);line-height:1.7;margin:0;">${s.reasoning || ''}</p>
+              </div>
+            </div>
+
+            <!-- Market Insight -->
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;">
+              <i class="fas fa-chart-line" style="color:var(--info);margin-top:3px;flex-shrink:0;"></i>
+              <p class="${isUr ? 'urdu-text' : ''}" style="font-size:11px;color:var(--fg-muted);line-height:1.6;margin:0;font-style:italic;">${s.market_insight || ''}</p>
+            </div>
+
+            <!-- Discuss on Copilot button -->
+            <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px;text-align:right;">
+              <button class="btn btn-sm btn-outline discuss-pricing-btn" style="padding:6px 12px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px;" type="button">
+                <i class="fas fa-comments"></i> ${isUr ? 'کراپ مائنڈ سے تبادلہ خیال کریں' : 'Discuss with CropMind AI'}
+              </button>
+            </div>
+          </div>
+        `;
+
+        const discussBtn = paResult.querySelector('.discuss-pricing-btn');
+        if (discussBtn) {
+          discussBtn.addEventListener('click', () => {
+            if (window.__openCopilot) {
+              window.__openCopilot();
+              // Preload discussions into CropMind input box
+              const chatInput = document.getElementById('chatInput');
+              if (chatInput) {
+                chatInput.value = isUr
+                  ? `مجھے اپنی فصل کے ریٹ کے متعلق مشورہ چاہیے۔ فصل: ${crop}، مارکیٹ ریٹ: ${s.suggested_price}۔`
+                  : `I want to discuss my crop price. Crop: ${crop}, predicted rate: ${s.suggested_price}.`;
+                chatInput.focus();
+              }
+            }
+          });
+        }
+      } else {
+        paResult.innerHTML = `
+          <div style="text-align:center;padding:20px;color:var(--fg-muted);font-size:13px;">
+            <i class="fas fa-exclamation-triangle" style="color:var(--warning);margin-right:6px;"></i>
+            ${isUr ? 'قیمت کا تجزیہ ناکام ہو گیا۔ دوبارہ کوشش کریں۔' : 'Price analysis failed. Please try again.'}
+          </div>
+        `;
+      }
+    });
+  }
+}
+
+await render();
+
+return () => {
+  container.classList.remove('wholesale-page');
+};
 }

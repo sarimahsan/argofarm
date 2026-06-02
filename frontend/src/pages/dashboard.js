@@ -2,7 +2,7 @@
 
 import { getState } from '../state.js';
 import { showToast, formatDate } from '../utils.js';
-import { apiGetAnalytics, apiGetOutbreaks } from '../api.js';
+import { apiGetAnalytics, apiGetOutbreaks, apiGetWeatherAdvisory, apiGetOutbreakForecast } from '../api.js';
 import { openModal, closeModal } from '../components/modal.js';
 import { renderMobileHeader } from '../components/sidebar.js';
 import { navigate } from '../router.js';
@@ -91,7 +91,7 @@ export async function mountDashboard(container) {
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr><th>Crop</th><th>Date</th><th>Status</th><th>Confidence</th><th>View</th></tr>
+              <tr><th>Crop</th><th>Date</th><th>Disease</th><th>Status</th><th>View</th></tr>
             </thead>
             <tbody id="dashTableBody">
               <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--fg-muted);">Loading...</td></tr>
@@ -115,75 +115,129 @@ export async function mountDashboard(container) {
   };
 }
 
-function getWeatherDetails(region) {
-  const r = (region || 'Punjab').trim().toLowerCase();
-  
-  if (r.includes('multan') || r.includes('bahawalpur') || r.includes('kasur')) {
-    return {
-      temp: 39,
-      condition: 'Sunny & Hot',
-      conditionUr: 'شدید گرمی اور دھوپ',
-      icon: 'fa-sun',
-      iconColor: '#f59e0b',
-      humidity: 35,
-      wind: 16,
-      rainProb: 5,
-      advice: 'High evaporation rates. Ensure timely evening/morning irrigation for cotton and maize crops to prevent heat stress.',
-      adviceUr: 'پانی کے بخارات بننے کی شرح زیادہ ہے۔ گرمی کے دباؤ سے بچنے کے لیے کپاس اور مکئی کی فصلوں کو صبح یا شام کے وقت بروقت پانی دیں۔'
+async function loadWeatherWidget(main, region, isUr) {
+  const wEl = main.querySelector('#weatherWidget');
+  if (!wEl) return;
+
+  try {
+    const lang = isUr ? 'ur' : 'en';
+    const result = await apiGetWeatherAdvisory(lang);
+
+    if (!result || result.status !== 'success' || !result.data) {
+      wEl.innerHTML = `<div style="text-align:center;padding:16px;color:var(--fg-muted);font-size:13px;"><i class="fas fa-cloud-sun" style="margin-right:6px;"></i> Weather data unavailable</div>`;
+      return;
+    }
+
+    const d = result.data;
+    const c = d.current || {};
+    const advisory = isUr ? (d.advisory_ur || d.advisory_en || '') : (d.advisory_en || '');
+    const forecast = d.forecast || [];
+    const isLive = d.source === 'live';
+
+    // Format day name from date string
+    const dayName = (dateStr) => {
+      try {
+        const dt = new Date(dateStr + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        if (dt.getTime() === today.getTime()) return isUr ? 'آج' : 'Today';
+        if (dt.getTime() === tomorrow.getTime()) return isUr ? 'کل' : 'Tomorrow';
+        return dt.toLocaleDateString(isUr ? 'ur-PK' : 'en-US', { weekday: 'short' });
+      } catch { return dateStr; }
     };
-  } else if (r.includes('karachi') || r.includes('hyderabad') || r.includes('gwadar')) {
-    return {
-      temp: 32,
-      condition: 'Humid & Overcast',
-      conditionUr: 'مرطوب اور ابر آلود',
-      icon: 'fa-cloud-sun',
-      iconColor: '#a1a1aa',
-      humidity: 78,
-      wind: 22,
-      rainProb: 15,
-      advice: 'High humidity increases risk of fungal blight. Monitor crop leaves closely and ensure proper field drainage.',
-      adviceUr: 'زیادہ نمی فنگس (پھپھوندی) کے پھیلاؤ کا باعث بن سکتی ہے۔ پتوں کا باقاعدگی سے معائنہ کریں اور نکاسی آب درست رکھیں۔'
-    };
-  } else if (r.includes('islamabad') || r.includes('rawalpindi') || r.includes('gilgit') || r.includes('muzaffarabad')) {
-    return {
-      temp: 27,
-      condition: 'Showers Forecast',
-      conditionUr: 'بارش کا امکان',
-      icon: 'fa-cloud-showers-water',
-      iconColor: '#3b82f6',
-      humidity: 85,
-      wind: 14,
-      rainProb: 80,
-      advice: 'Rain showers expected today. Postpone any planned pesticide or fertilizer spraying to avoid run-off waste.',
-      adviceUr: 'آج بارش متوقع ہے۔ کیڑے مار ادویات یا کھاد کا سپرے ملتوی کریں تاکہ وہ بارش کے پانی میں بہہ کر ضائع نہ ہوں۔'
-    };
-  } else if (r.includes('peshawar') || r.includes('quetta')) {
-    return {
-      temp: 29,
-      condition: 'Windy & Clear',
-      conditionUr: 'تیز ہوا اور صاف موسم',
-      icon: 'fa-wind',
-      iconColor: '#38bdf8',
-      humidity: 40,
-      wind: 28,
-      rainProb: 10,
-      advice: 'High wind speeds alert. Secure greenhouse covers and avoid spraying pesticides under gusty wind conditions.',
-      adviceUr: 'تیز ہواؤں کا الرٹ۔ گرین ہاؤس کور کو مضبوط کریں اور تیز تیز ہوا کے دوران کیڑے مار ادویات کا سپرے کرنے سے گریز کریں۔'
-    };
-  } else {
-    // Default Punjab / Lahore / Faisalabad / Gujranwala / Sialkot
-    return {
-      temp: 34,
-      condition: 'Pleasant Sunshine',
-      conditionUr: 'خوشگوار دھوپ',
-      icon: 'fa-sun',
-      iconColor: '#fbbf24',
-      humidity: 50,
-      wind: 12,
-      rainProb: 20,
-      advice: 'Excellent weather for field activity. Great time to apply balanced NPK fertilizers and perform weeding.',
-      adviceUr: 'فیلڈ کی سرگرمی کے لیے بہترین موسم۔ متوازن کھادیں ڈالنے اور جڑی بوٹیوں کی تلفی کے لیے یہ مناسب وقت ہے۔'
-    };
+
+    // Build 7-day forecast HTML
+    let forecastHTML = '';
+    if (forecast.length > 0) {
+      forecastHTML = `
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;color:var(--fg-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <i class="fas fa-calendar-week" style="color:var(--accent);"></i>
+            ${isUr ? '7 دن کی پیش گوئی' : '7-Day Forecast'}
+            ${isLive ? '<span class="pulse-dot" style="width:5px;height:5px;background:var(--accent);"></span><span style="font-size:9px;color:var(--accent);font-weight:600;">LIVE</span>' : ''}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;overflow-x:auto;">
+            ${forecast.map((f, i) => `
+              <div style="text-align:center;padding:8px 4px;border-radius:10px;background:${i === 0 ? 'rgba(46,204,64,0.08)' : 'rgba(255,255,255,0.02)'};border:1px solid ${i === 0 ? 'rgba(46,204,64,0.2)' : 'var(--border)'};transition:all 0.2s;" onmouseenter="this.style.background='rgba(46,204,64,0.1)';this.style.transform='translateY(-2px)'" onmouseleave="this.style.background='${i === 0 ? 'rgba(46,204,64,0.08)' : 'rgba(255,255,255,0.02)'}';this.style.transform='none'">
+                <div style="font-size:10px;font-weight:700;color:${i === 0 ? 'var(--accent)' : 'var(--fg-muted)'};margin-bottom:6px;">${dayName(f.date)}</div>
+                <div style="font-size:18px;margin-bottom:4px;color:${f.icon_color};filter:drop-shadow(0 0 4px ${f.icon_color}44);"><i class="fas ${f.icon}"></i></div>
+                <div style="font-size:11px;font-weight:800;color:var(--fg);">${f.temp_max != null ? Math.round(f.temp_max) : '--'}°</div>
+                <div style="font-size:9px;color:var(--fg-muted);">${f.temp_min != null ? Math.round(f.temp_min) : '--'}°</div>
+                <div style="font-size:9px;margin-top:4px;color:${f.precip_prob > 50 ? '#3b82f6' : 'var(--fg-muted)'};font-weight:${f.precip_prob > 50 ? '700' : '500'};"><i class="fas fa-droplet" style="font-size:7px;"></i> ${f.precip_prob != null ? f.precip_prob : 0}%</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    wEl.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;">
+        <div style="display:flex;align-items:center;gap:18px;">
+          <div style="font-size:42px;color:${c.icon_color || '#fbbf24'};filter:drop-shadow(0 0 8px ${c.icon_color || '#fbbf24'}55);animation:pulse 2s infinite alternate;">
+            <i class="fas ${c.icon || 'fa-cloud-sun'}"></i>
+          </div>
+          <div>
+            <div style="display:flex;align-items:baseline;gap:4px;">
+              <span style="font-size:32px;font-weight:800;color:var(--fg);">${c.temp != null ? Math.round(c.temp) : '--'}</span>
+              <span style="font-size:20px;font-weight:600;color:var(--accent);">°C</span>
+            </div>
+            <div style="font-size:14px;font-weight:600;color:var(--fg-muted);">${isUr ? (c.condition_ur || 'موسم') : (c.condition_en || 'Weather')}</div>
+            <div style="font-size:11px;color:var(--accent);margin-top:2px;display:flex;align-items:center;gap:4px;">
+              <i class="fas fa-map-marker-alt"></i> ${d.city || region || 'Pakistan'}
+              ${isLive ? '<span class="badge badge-green" style="font-size:8px;padding:1px 5px;margin-left:4px;">LIVE</span>' : ''}
+            </div>
+          </div>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:16px;background:rgba(255,255,255,0.03);padding:10px 18px;border-radius:12px;border:1px solid var(--border);">
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:var(--fg-muted);text-transform:uppercase;">${isUr ? 'نمی' : 'Humidity'}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--fg);margin-top:2px;">${c.humidity != null ? Math.round(c.humidity) : '--'}%</div>
+          </div>
+          <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border);padding:0 12px;">
+            <div style="font-size:10px;color:var(--fg-muted);text-transform:uppercase;">${isUr ? 'ہوا' : 'Wind'}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--fg);margin-top:2px;">${c.wind != null ? Math.round(c.wind) : '--'} <span style="font-size:9px;">km/h</span></div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:10px;color:var(--fg-muted);text-transform:uppercase;">${isUr ? 'بارش' : 'Precip.'}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--fg);margin-top:2px;">${forecast.length > 0 ? (forecast[0].precip_prob || 0) : '--'}%</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);display:flex;align-items:flex-start;gap:10px;">
+        <span class="badge badge-green" style="font-size:10px;padding:3px 8px;margin-top:2px;flex-shrink:0;">
+          <i class="fas fa-robot"></i> ${isUr ? 'کراپ مائنڈ AI مشورہ' : 'CropMind AI Advisory'}
+        </span>
+        <div class="${isUr ? 'urdu-text' : ''}" style="font-size:12px;color:var(--fg);line-height:1.7;font-weight:500;">
+          ${advisory || (isUr ? 'مشورہ دستیاب نہیں' : 'Advisory unavailable')}
+        </div>
+      </div>
+
+      ${forecastHTML}
+      
+      <button class="icon-btn" id="refreshWeatherBtn" type="button" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--fg-muted);cursor:pointer;" title="${isUr ? 'تازہ کریں' : 'Refresh Weather'}">
+        <i class="fas fa-rotate"></i>
+      </button>
+    `;
+
+    // Refresh listener
+    wEl.querySelector('#refreshWeatherBtn').addEventListener('click', () => {
+      const icon = wEl.querySelector('#refreshWeatherBtn i');
+      icon.classList.add('fa-spin');
+      showToast(isUr ? 'موسم کی تازہ ترین معلومات حاصل کی جا رہی ہیں...' : 'Refreshing live weather data...');
+      loadWeatherWidget(main, region, isUr).then(() => {
+        const newIcon = wEl.querySelector('#refreshWeatherBtn i');
+        if (newIcon) newIcon.classList.remove('fa-spin');
+      });
+    });
+
+  } catch (err) {
+    console.error('Weather widget error:', err);
+    wEl.innerHTML = `<div style="text-align:center;padding:16px;color:var(--fg-muted);font-size:13px;"><i class="fas fa-exclamation-triangle" style="margin-right:6px;color:var(--warning);"></i> Weather data error</div>`;
   }
 }
 
@@ -198,69 +252,8 @@ async function loadDashboardData(main) {
   main.querySelector('#dashName').textContent = user.name.split(' ')[0] || 'User';
   main.querySelector('#dashRegion').textContent = user.region || 'Your Region';
 
-  // Render Weather Widget
-  const wEl = main.querySelector('#weatherWidget');
-  if (wEl) {
-    const w = getWeatherDetails(user.region);
-    wEl.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;">
-        <div style="display:flex;align-items:center;gap:18px;">
-          <div style="font-size:42px;color:${w.iconColor};filter:drop-shadow(0 0 8px ${w.iconColor}55);animation:pulse 2s infinite alternate;">
-            <i class="fas ${w.icon}"></i>
-          </div>
-          <div>
-            <div style="display:flex;align-items:baseline;gap:4px;">
-              <span style="font-size:32px;font-weight:800;color:var(--fg);">${w.temp}</span>
-              <span style="font-size:20px;font-weight:600;color:var(--accent);">°C</span>
-            </div>
-            <div style="font-size:14px;font-weight:600;color:var(--fg-muted);">${isUr ? w.conditionUr : w.condition}</div>
-            <div style="font-size:11px;color:var(--accent);margin-top:2px;">
-              <i class="fas fa-map-marker-alt"></i> ${user.region || 'Punjab'}
-            </div>
-          </div>
-        </div>
-        
-        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:16px;background:rgba(255,255,255,0.03);padding:10px 18px;border-radius:12px;border:1px solid var(--border);">
-          <div style="text-align:center;">
-            <div style="font-size:10px;color:var(--fg-muted);text-transform:uppercase;">${isUr ? 'نمی' : 'Humidity'}</div>
-            <div style="font-size:13px;font-weight:700;color:var(--fg);margin-top:2px;">${w.humidity}%</div>
-          </div>
-          <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border);padding:0 12px;">
-            <div style="font-size:10px;color:var(--fg-muted);text-transform:uppercase;">${isUr ? 'ہوا' : 'Wind'}</div>
-            <div style="font-size:13px;font-weight:700;color:var(--fg);margin-top:2px;">${w.wind} <span style="font-size:9px;">km/h</span></div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:10px;color:var(--fg-muted);text-transform:uppercase;">${isUr ? 'بارش' : 'Precip.'}</div>
-            <div style="font-size:13px;font-weight:700;color:var(--fg);margin-top:2px;">${w.rainProb}%</div>
-          </div>
-        </div>
-      </div>
-      
-      <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);display:flex;align-items:flex-start;gap:10px;">
-        <span class="badge badge-green" style="font-size:10px;padding:3px 8px;margin-top:2px;flex-shrink:0;">
-          <i class="fas fa-user-doctor"></i> ${isUr ? 'ماہرِ زراعت مشورہ' : 'Agronomist Tip'}
-        </span>
-        <div class="${isUr ? 'urdu-text' : ''}" style="font-size:12px;color:var(--fg);line-height:1.6;font-weight:500;">
-          ${isUr ? w.adviceUr : w.advice}
-        </div>
-      </div>
-      
-      <button class="icon-btn" id="refreshWeatherBtn" type="button" style="position:absolute;top:12px;right:12px;background:none;border:none;color:var(--fg-muted);cursor:pointer;" title="${isUr ? 'تازہ کریں' : 'Refresh Weather'}">
-        <i class="fas fa-rotate"></i>
-      </button>
-    `;
-    
-    // Refresh listener
-    wEl.querySelector('#refreshWeatherBtn').addEventListener('click', () => {
-      const icon = wEl.querySelector('#refreshWeatherBtn i');
-      icon.classList.add('fa-spin');
-      showToast(isUr ? 'موسم کی تازہ ترین معلومات حاصل کی جا رہی ہیں...' : 'Refreshing weather data...');
-      setTimeout(() => {
-        icon.classList.remove('fa-spin');
-        loadDashboardData(main);
-      }, 1000);
-    });
-  }
+  // Render Weather Widget (real-time via Open-Meteo + Gemini AI)
+  loadWeatherWidget(main, user.region, isUr);
 
   main.querySelector('#statScans').textContent = summary.total_scans || 0;
   main.querySelector('#statCrops').textContent = summary.crop_types_count || 0;
@@ -281,8 +274,8 @@ async function loadDashboardData(main) {
       <tr data-id="${s.id}">
         <td style="font-weight:500;">${s.crop_type}</td>
         <td style="color:var(--fg-muted);">${formatDate(s.created_at)}</td>
+        <td style="font-weight:600;color:var(--fg);">${s.disease}</td>
         <td><span class="badge ${s.status === 'Healthy' ? 'badge-green' : s.status === 'Diseased' ? 'badge-red' : 'badge-yellow'}">${s.status}</span></td>
-        <td>${s.confidence || 0}%</td>
         <td><button class="btn btn-sm btn-outline view-btn" type="button">View</button></td>
       </tr>
     `).join('');
@@ -305,21 +298,107 @@ async function initMap(main) {
   const el = main.querySelector('#outbreakMap');
   if (!el || typeof L === 'undefined') return;
 
+  // Initialize Map
   mapInstance = L.map(el, { center: [30.3753, 69.3451], zoom: 5, zoomControl: false });
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; CartoDB &copy; OSM', subdomains: 'abcd', maxZoom: 19
   }).addTo(mapInstance);
   L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
 
-  const result = await apiGetOutbreaks();
-  if (result && result.status === 'success') {
-    result.data.forEach(o => {
+  // Initialize Layer Groups
+  const activePinsGroup = L.layerGroup();
+  const predictedHotspotsGroup = L.layerGroup();
+  let heatLayer = null;
+
+  // 1. Fetch Active Outbreaks
+  const activeResult = await apiGetOutbreaks();
+  if (activeResult && activeResult.status === 'success') {
+    const activeData = activeResult.data || [];
+    
+    // Create Circle Markers for Active Pins
+    activeData.forEach(o => {
       const color = o.status === 'Healthy' ? '#2ecc40' : o.status === 'Warning' ? '#f59e0b' : '#ef4444';
-      L.circle(o.coordinates, { color, fillColor: color, fillOpacity: 0.3, radius: 12000 })
-        .bindPopup(`<div style="font-family:Inter,sans-serif;"><b style="color:${color};">${o.disease}</b><br>${o.crop} — ${o.region}<br>Confidence: ${o.confidence}%</div>`)
-        .addTo(mapInstance);
+      L.circle(o.coordinates, { color, fillColor: color, fillOpacity: 0.25, radius: 14000, weight: 1.5 })
+        .bindPopup(`<div style="font-family:Inter,sans-serif;"><b style="color:${color};">${o.disease}</b><br>${o.crop} — ${o.region}<br>Status: ${o.status}</div>`)
+        .addTo(activePinsGroup);
+    });
+
+    // Create Density Heatmap Points (scaling intensity based on confidence / severity)
+    if (typeof L.heatLayer !== 'undefined') {
+      const heatPoints = activeData.map(o => {
+        const intensity = o.status === 'Healthy' ? 0.3 : o.status === 'Warning' ? 0.6 : 0.9;
+        return [o.coordinates[0], o.coordinates[1], intensity];
+      });
+      heatLayer = L.heatLayer(heatPoints, {
+        radius: 30,
+        blur: 18,
+        maxZoom: 9,
+        gradient: { 0.2: '#3b82f6', 0.4: '#10b981', 0.6: '#eab308', 0.9: '#ef4444' }
+      });
+    }
+  }
+
+  // 2. Fetch AI Outbreak Forecast Predictions
+  const forecastResult = await apiGetOutbreakForecast();
+  if (forecastResult && forecastResult.status === 'success') {
+    const predictions = forecastResult.data || [];
+    predictions.forEach(p => {
+      const popupHTML = `
+        <div style="font-family:'Inter', sans-serif;width:240px;padding:2px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:9px;text-transform:uppercase;color:var(--accent);letter-spacing:0.5px;font-weight:700;">🔮 CropMind AI Forecast</span>
+            <span class="badge ${p.risk_level === 'High' ? 'badge-red' : 'badge-yellow'}" style="font-size:9px;padding:2px 6px;text-transform:uppercase;">${p.risk_level} Risk</span>
+          </div>
+          <div style="font-size:14px;font-weight:700;color:var(--danger);margin-bottom:4px;">${p.predicted_disease}</div>
+          <div style="font-size:11px;color:var(--fg-muted);margin-bottom:8px;">Crop: <b>${p.crop}</b> in <b>${p.region}</b></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:8px;background:rgba(234,88,12,0.1);padding:6px;border-radius:6px;border:1px solid rgba(234,88,12,0.15);">
+            <span style="color:var(--fg-muted);">Migration Probability</span>
+            <span style="font-weight:700;color:#ea580c;">${p.spread_probability}%</span>
+          </div>
+          <div style="font-size:11px;line-height:1.6;color:var(--fg);border-top:1px solid var(--border);padding-top:8px;margin-top:6px;">
+            ${p.reasoning}
+          </div>
+        </div>
+      `;
+
+      // Draw radar scan rings for forecasting
+      L.circle(p.coordinates, {
+        color: '#f97316', 
+        fillColor: '#ea580c', 
+        fillOpacity: 0.05, 
+        radius: 20000, 
+        weight: 1.2,
+        dashArray: '6, 6'
+      }).addTo(predictedHotspotsGroup);
+
+      // Core pulsing radar hotspot node
+      L.circleMarker(p.coordinates, {
+        radius: 7,
+        color: '#ea580c',
+        fillColor: '#ffffff',
+        fillOpacity: 0.9,
+        weight: 2
+      }).bindPopup(popupHTML).addTo(predictedHotspotsGroup);
     });
   }
+
+  // 3. Set Default Overlay States
+  activePinsGroup.addTo(mapInstance);
+  predictedHotspotsGroup.addTo(mapInstance);
+  if (heatLayer) heatLayer.addTo(mapInstance);
+
+  // 4. Construct Overlay Selector Maps
+  const overlays = {
+    '<i class="fas fa-map-marker-alt" style="color:#ef4444;margin-right:6px;"></i> Active Outbreaks': activePinsGroup,
+    '<i class="fas fa-bullseye" style="color:#ea580c;margin-right:6px;"></i> CropMind Predicted Hotspots': predictedHotspotsGroup
+  };
+  
+  if (heatLayer) {
+    overlays['<i class="fas fa-fire" style="color:#eab308;margin-right:6px;"></i> Density Heatmap'] = heatLayer;
+  }
+
+  // 5. Add Control to Map (beautiful styled widget in top-right)
+  L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(mapInstance);
 }
 
 function initChart(main, cropStats) {

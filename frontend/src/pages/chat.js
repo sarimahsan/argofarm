@@ -46,6 +46,7 @@ export async function mountChat(container) {
           </div>
           <button class="icon-btn" id="audioToggle" type="button" title="Audio On"><i class="fas fa-volume-high" style="color:var(--accent);"></i></button>
           <button class="icon-btn" id="toggleHistoryBtn" type="button" title="Chat History"><i class="fas fa-history"></i></button>
+          <button class="icon-btn" id="copilotCloseBtn" type="button" title="Close Drawer"><i class="fas fa-xmark"></i></button>
         </div>
       </header>
 
@@ -102,6 +103,14 @@ export async function mountChat(container) {
   container.querySelector('#toggleHistoryBtn').addEventListener('click', toggleHistory);
   container.querySelector('#chatHistoryBack').addEventListener('click', toggleHistory);
   container.querySelector('#newChatBtn').addEventListener('click', startNewChat);
+
+  // Global Copilot Close button
+  const copilotCloseBtn = container.querySelector('#copilotCloseBtn');
+  if (copilotCloseBtn) {
+    copilotCloseBtn.addEventListener('click', () => {
+      window.__closeCopilot && window.__closeCopilot();
+    });
+  }
 
   // Send message
   container.querySelector('#sendBtn').addEventListener('click', sendMessage);
@@ -483,7 +492,6 @@ async function handleImageUpload(e) {
 function showResultCard(data) {
   const isEn = getState().currentLang === 'en';
   const advisory = typeof data.advisory === 'object' ? (isEn ? data.advisory.en : data.advisory.ur) : (data.advisory || '');
-  const cid = 'conf_' + Math.random().toString(36).substr(2, 6);
 
   addBotHTML(`
     <div class="result-card">
@@ -493,27 +501,18 @@ function showResultCard(data) {
           <div style="font-size:16px;font-weight:700;color:var(--danger);">${data.disease}</div>
           <div style="font-size:12px;color:var(--fg-muted);margin-top:2px;">${data.crop_type || ''} — ${data.region || ''}</div>
         </div>
-        <span class="badge badge-red">${data.status}</span>
+        <span class="badge ${data.status === 'Healthy' ? 'badge-green' : 'badge-red'}">${data.status}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
-        <span style="color:var(--fg-muted);">${isEn ? 'Confidence' : 'اعتماد'}</span>
-        <span style="font-weight:600;">${data.confidence}%</span>
-      </div>
-      <div class="confidence-bar"><div class="confidence-fill" id="${cid}" style="width:0%;"></div></div>
-      ${advisory ? `<div class="advisory-section">
-        <div style="font-size:10px;text-transform:uppercase;color:var(--accent);letter-spacing:0.5px;margin-bottom:4px;font-weight:600;">
-          <i class="fas fa-lightbulb" style="margin-right:4px;"></i> ${isEn ? 'Advisory' : 'مشورہ'}
+      ${advisory ? `<div class="advisory-section" style="margin-top:12px;">
+        <div style="font-size:11px;text-transform:uppercase;color:var(--accent);letter-spacing:0.5px;margin-bottom:6px;font-weight:600;">
+          <i class="fas fa-prescription-bottle-medical" style="margin-right:4px;"></i> ${isEn ? 'AI Treatment & Saving Advisory' : 'اے آئی تشخیصی و بچاؤ ایڈوائزری'}
         </div>
-        <div>${advisory}</div>
+        <div style="font-size:13px;line-height:1.7;color:var(--fg);">${parseMarkdown(advisory)}</div>
       </div>` : ''}
     </div>
   `);
-
-  setTimeout(() => {
-    const bar = chatContainer.querySelector(`#${cid}`);
-    if (bar) bar.style.width = data.confidence + '%';
-  }, 100);
 }
+
 
 function showCropRecommendCard(data) {
   const isEn = getState().currentLang === 'en';
@@ -1072,3 +1071,86 @@ function toggleAudio() {
   if (!enabled) window.speechSynthesis?.cancel();
   showToast(enabled ? 'Audio enabled' : 'Audio muted');
 }
+
+// ====== GLOBAL SAAS COPILOT INTEGRATION APIs ======
+
+function formatDealReportInChat(rawText, isUr) {
+  let html = rawText.trim();
+  html = html.replace(/\n/g, '<br/>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--fg);font-weight:700;">$1</strong>');
+  
+  // Style headers
+  html = html.replace(/###\s+([^\n<]+)/g, '<h3 style="font-size:13px;font-weight:800;color:var(--accent);margin-top:14px;margin-bottom:6px;border-bottom:1px dashed var(--border);padding-bottom:4px;">$1</h3>');
+  html = html.replace(/##\s+([^\n<]+)/g, '<h2 style="font-size:15px;font-weight:800;color:var(--accent);margin-top:18px;margin-bottom:8px;">$1</h2>');
+  
+  // Convert bullets to checked rows
+  html = html.replace(/[\*\-]\s+([^\n<]+)/g, '<div style="display:flex;gap:6px;margin-bottom:4px;align-items:flex-start;font-size:12.5px;"><i class="fas fa-circle-check" style="color:var(--accent);margin-top:4px;font-size:9px;flex-shrink:0;"></i><div>$1</div></div>');
+  
+  // Badges
+  html = html.replace(/🔥\s*Excellent Bargain/gi, '<span class="badge badge-green" style="font-size:10px;padding:3px 8px;margin-bottom:8px;"><i class="fas fa-fire"></i> EXCELLENT BARGAIN</span>');
+  html = html.replace(/🟢\s*Fair Price/gi, '<span class="badge badge-blue" style="font-size:10px;padding:3px 8px;margin-bottom:8px;"><i class="fas fa-circle-check"></i> FAIR PRICE</span>');
+  html = html.replace(/⚠️\s*Overpriced/gi, '<span class="badge badge-red" style="font-size:10px;padding:3px 8px;margin-bottom:8px;"><i class="fas fa-circle-exclamation"></i> OVERPRICED</span>');
+  
+  html = html.replace(/🔥\s*بہترین قیمت/g, '<span class="badge badge-green" style="font-size:10px;padding:3px 8px;margin-bottom:8px;"><i class="fas fa-fire"></i> بہترین قیمت</span>');
+  html = html.replace(/🟢\s*مناسب قیمت/g, '<span class="badge badge-blue" style="font-size:10px;padding:3px 8px;margin-bottom:8px;"><i class="fas fa-circle-check"></i> مناسب قیمت</span>');
+  html = html.replace(/⚠️\s*زیادہ قیمت/g, '<span class="badge badge-red" style="font-size:10px;padding:3px 8px;margin-bottom:8px;"><i class="fas fa-circle-exclamation"></i> زیادہ قیمت</span>');
+
+  return `
+    <div class="result-card" style="margin-top:4px;">
+      <div style="font-size:10px;text-transform:uppercase;color:var(--fg-muted);letter-spacing:0.5px;margin-bottom:8px;font-weight:600;display:flex;align-items:center;gap:4px;">
+        <i class="fas fa-brain"></i> ${isUr ? 'کراپ مائنڈ ڈیل تجزیہ' : 'CropMind B2B Deal Analysis'}
+      </div>
+      <div style="font-size:12.5px;line-height:1.65;color:var(--fg);">${html}</div>
+    </div>
+  `;
+}
+
+window.__assessWholesaleDealInCopilot = async function(item) {
+  // 1. Slide open the Copilot drawer
+  window.__openCopilot && window.__openCopilot();
+  
+  // 2. Set active session if not exists
+  const state = getState();
+  if (!state.activeChatSessionId) {
+    setState({ activeChatSessionId: generateUUID() });
+  }
+  
+  // Activate chat layout in sidebar
+  activateChat();
+  
+  const isUr = state.currentLang === 'ur';
+  
+  // 3. Print user inquiry message in chat bubble
+  const inquiryText = isUr 
+    ? `براہ کرم اس ہول سیل سودے کا جائزہ لیں: **${item.title}** (قیمت: ${item.price}، بیچنے والا: ${item.seller_name})`
+    : `Please evaluate this wholesale B2B deal: **${item.title}** listed at **${item.price}** by **${item.seller_name}**.`;
+    
+  addUserMessage(inquiryText);
+  
+  // 4. Show typing indicator
+  addTyping();
+  
+  // 5. Run wholesale evaluation API
+  const res = await apiAnalyzeWholesaleDeal(item.id, state.currentLang);
+  
+  // 6. Remove typing indicator
+  removeTyping();
+  
+  if (res && res.status === 'success') {
+    const reportText = res.data.analysis;
+    const formattedHtml = formatDealReportInChat(reportText, isUr);
+    addBotHTML(formattedHtml);
+    
+    // Auto speak summary of evaluation if audio is enabled
+    if (state.audioPlaybackEnabled) {
+      const summaryText = isUr
+        ? "سودے کا تجزیہ مکمل ہو گیا ہے۔ تفصیلات چیٹ میں دیکھیں۔"
+        : "Deal evaluation is complete. Please review the advisory details displayed in the chat.";
+      speakText(summaryText, state.currentLang);
+    }
+  } else {
+    addBotMessage(isUr 
+      ? "معذرت، میں اس وقت اس سودے کا جائزہ نہیں لے سکتا۔ براہ کرم دوبارہ کوشش کریں۔"
+      : "Sorry, I was unable to evaluate this B2B deal at the moment. Please try again.");
+  }
+};

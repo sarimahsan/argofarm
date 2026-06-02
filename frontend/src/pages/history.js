@@ -173,7 +173,6 @@ async function fetchAndRenderHistory(main, strings) {
           <h3 class="scan-card-disease">${s.disease}</h3>
           <div class="scan-card-bottom">
             <span><i class="fas fa-map-marker-alt"></i> ${s.region || 'Punjab'}</span>
-            <span><b>${strings.confidence}:</b> ${s.confidence || 0}%</span>
           </div>
         </div>
       </div>

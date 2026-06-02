@@ -6,7 +6,7 @@ const state = {
   theme: localStorage.getItem('appTheme') || 'dark',
   user: null,
   authToken: null,
-  sidebarExpanded: false,
+  sidebarExpanded: localStorage.getItem('sidebarExpanded') !== null ? localStorage.getItem('sidebarExpanded') === 'true' : true,
   activeChatSessionId: '',
   chatStep: 0,
   audioPlaybackEnabled: true,
