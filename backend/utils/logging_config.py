@@ -13,21 +13,21 @@ def configure_logging(app=None):
     Reduces verbosity of external libraries and provides clean output.
     """
     
-    # Suppress verbose TensorFlow logging
+    # Suppress verbose TensorFlow logging (optional)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Only show errors
     
-    # Suppress TensorFlow INFO and WARNING messages
-    import tensorflow as tf
-    tf.get_logger().setLevel(logging.ERROR)
+    try:
+        import tensorflow as tf
+        tf.get_logger().setLevel(logging.ERROR)
+        logging.getLogger('tensorflow.ops').setLevel(logging.ERROR)
+    except ImportError:
+        pass  # TensorFlow not installed, that's OK
     
     # Suppress oneDNN logging
     os.environ['DNNL_VERBOSE'] = '0'
     
     # Suppress absl logging
     logging.getLogger('absl').setLevel(logging.ERROR)
-    
-    # Suppress TensorFlow ops logging
-    logging.getLogger('tensorflow.ops').setLevel(logging.ERROR)
     
     # Suppress matplotlib logging if used
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
