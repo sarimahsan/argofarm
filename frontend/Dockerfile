@@ -20,7 +20,6 @@ FROM nginx:alpine
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY nginx-default.conf /etc/nginx/conf.d/default.conf
 
 # Remove default nginx files
 RUN rm -rf /usr/share/nginx/html/*
