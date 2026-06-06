@@ -173,10 +173,17 @@ body:not(.urdu) .urdu-text {
   gap: 8px;
   z-index: 100;
   transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   flex-shrink: 0;
   position: sticky;
   top: 0;
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 body.sidebar-expanded .sidebar {
@@ -269,6 +276,7 @@ body.sidebar-expanded .sidebar-toggle {
 .sidebar-btn {
   width: 46px;
   height: 46px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -894,6 +902,7 @@ body.sidebar-expanded .sidebar-btn-text {
   flex: 1;
   padding: 40px 24px;
   animation: fadeScale 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow-y: auto;
 }
 
 @keyframes fadeScale {

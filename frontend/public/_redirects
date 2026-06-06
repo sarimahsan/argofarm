@@ -1,0 +1,3 @@
+/api/*      http://216.128.148.254:3000/api/:splat      200!
+/static/*   http://216.128.148.254:3000/static/:splat   200!
+/*          /index.html                                 200
