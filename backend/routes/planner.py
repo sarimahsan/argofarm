@@ -42,6 +42,7 @@ def generate_crop_plan(payload):
             "   - Month 4: Irrigation scheduling and harvesting/yield planning\n\n"
             "Write the response directly in the requested language (either English or Urdu).\n"
             "Use clean Markdown formatting with headers (e.g. ### Month 1: Soil Preparation), bullet points, and bold tags. "
+            "Keep the entire plan extremely structured, concise, and under 250 words total. "
             "Keep it highly encouraging, practical, and optimized for farmers in Pakistan."
         )
         
@@ -61,7 +62,7 @@ def generate_crop_plan(payload):
         
         # Call Groq AI completions engine
         logger.debug("Dispatching request to Groq client completions...")
-        ai_response = call_groq_completions(messages, max_tokens=1200, temperature=0.5)
+        ai_response = call_groq_completions(messages, max_tokens=400, temperature=0.5)
         
         # Fallback offline generator if Groq completions returns empty or fails
         if not ai_response:

@@ -53,49 +53,41 @@ def predict(payload):
 
         # System and user prompts for Gemini Vision
         system_prompt = (
-            "You are 'Dr. Crop AI', the chief crop pathologist and plant surgeon in Pakistan.\n"
-            "Analyze the crop leaf image and identify any diseases present. Return ONLY a valid JSON object.\n"
-            "CRITICAL: Keep both advisory fields highly structured but extremely concise so the JSON response does not exceed buffer limits. "
-            "All string values must escape newlines as '\\n'; do not use literal unescaped newlines.\n"
+            "You are 'Dr. Crop AI', the preeminent agricultural expert and chief crop pathologist in Pakistan, running a premium diagnostic service.\n"
+            "Analyze the crop leaf image and identify the exact disease. Return ONLY a valid JSON object.\n"
+            "DIAGNOSTIC GUIDELINES:\n"
+            "1. CROP IDENTIFICATION: If the crop type is provided as 'Unknown', perform a detailed botanical analysis of the leaf architecture (margins, shape, venation, color) to identify the crop species (e.g. 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.). Set this value in the 'crop_type' key.\n"
+            "2. DISEASE DIAGNOSIS: Do NOT default to 'Unknown' or 'Generic Leaf Spot' unless the image does not show a plant. Examine the leaf surface meticulously for early signs of fungal lesions, bacterial streaks, viral mosaic patterns, chlorosis, necrosis, rust pustules, or pest damage. Attempt a specific best-guess agronomist diagnosis (e.g., 'Potato Late Blight', 'Wheat Leaf Rust', 'Rice Blast', 'Tomato Early Blight', 'Cotton Leaf Curl Virus', etc.) and include the Urdu transliteration in parentheses.\n"
+            "3. ADVISORY CONTENT: Provide professional, high-yield agronomist recommendations. Under **Symptoms**, describe precise visual markers shown in the leaf. Under **Organic Remedies**, list actionable organic solutions used in Pakistan (e.g. neem oil spray, ash dusting, organic compost teas). Under **Chemical Remedies**, list specific active chemical compounds used in Pakistan (e.g. Mancozeb, Copper Oxychloride, Tebuconazole, Azoxystrobin) with recommended dosages. Under **Prevention**, list physical or cultural farm hygiene guidelines (e.g., proper spacing, clean tools, crop rotation).\n\n"
             "The JSON object must have exactly these keys:\n"
-            "- \"crop_type\": The identified crop species (e.g., 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.)\n"
-            "- \"disease\": Specific disease name with Urdu transliteration in parentheses (e.g. 'Wheat Leaf Rust (پیلی کنگی)', 'Potato Late Blight (آلو کا پچھیتا جھلساؤ)', or 'Healthy (صحت مند)')\n"
-            "- \"confidence\": A numeric confidence value between 0 and 100\n"
+            "- \"crop_type\": The identified crop species (e.g. 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.)\n"
+            "- \"disease\": Specific disease name with Urdu transliteration in parentheses (e.g. 'Wheat Leaf Rust (پیلی کنگی)', 'Potato Late Blight (آلو کا پچھیتا جھلساؤ)', 'Cotton Leaf Curl Virus (کپاس کے پتوں کا مڑنا)', or 'Healthy (صحت مند)')\n"
+            "- \"confidence\": A numeric confidence value between 0 and 100 based on visible markers\n"
             "- \"status\": 'Healthy' if the leaf has no pathology, otherwise 'Diseased'\n"
-            "- \"advisory_english\": A concise, step-by-step crop-saving advisory in English formatted in clean markdown. "
-            "Provide exactly 2 brief bullet points or short sentences under the headers: **Symptoms**, **Organic Remedies**, **Chemical Remedies**, and **Prevention** (maximum 120 words total).\n"
-            "- \"advisory_urdu\": A matching, highly concise, step-by-step crop-saving advisory in Urdu matching the English remedies, also formatted in clean markdown (maximum 120 words total)."
+            "- \"advisory_english\": A detailed, premium crop-saving advisory in English formatted in clean markdown. Provide exactly 2 brief bullet points or short sentences under each of these headers: **Symptoms**, **Organic Remedies**, **Chemical Remedies**, and **Prevention**.\n"
+            "- \"advisory_urdu\": A matching, highly premium, step-by-step crop-saving advisory in Urdu matching the English remedies, also formatted in clean markdown with the exact same headers: **علامات**, **نامیاتی علاج**, **کیمیائی علاج**, and **بچاؤ**."
         )
 
         user_prompt = (
-            f"Analyze this image of '{crop_type}' crop leaf from '{region}' region.\n"
-            f"Identify the crop type, pathology symptoms, spot patterns, and diagnose any disease.\n"
-            f"Provide a highly concise, professional, step-by-step rescue plan to save the crop (max 120 words per language).\n"
-            f"Return ONLY a clean JSON object following the schema outlined in the system instruction."
+            f"Perform a professional crop pathologist diagnosis on this crop leaf image. The user suspects it is '{crop_type}' from the '{region}' region, but verify the crop type yourself.\n"
+            "Inspect leaf shape, spots, necrotic spots, chlorotic halos, edges, and dust. Return ONLY a clean JSON object following the schema outlined in the system instruction."
         )
 
-        logger.info("Dispatching image to Gemini 2.5 Flash Vision API...")
+        logger.info("Dispatching image to Gemini Vision API (gemini-3.5-flash fallback chain)...")
         gemini_resp = call_gemini_vision(
             prompt=user_prompt,
             base64_image=base64_image,
             system_instruction=system_prompt,
             temperature=0.15,
+            max_tokens=1024,
             json_mode=True
         )
 
         parsed = None
         if gemini_resp:
             try:
-                # Strip potential markdown wrapper blocks
-                clean_resp = gemini_resp.strip()
-                if clean_resp.startswith("```json"):
-                    clean_resp = clean_resp[7:]
-                if clean_resp.startswith("```"):
-                    clean_resp = clean_resp[3:]
-                if clean_resp.endswith("```"):
-                    clean_resp = clean_resp[:-3]
-                clean_resp = clean_resp.strip()
-
+                from utils.gemini_client import extract_json_from_text
+                clean_resp = extract_json_from_text(gemini_resp)
                 parsed = json.loads(clean_resp)
                 detected_crop = parsed.get("crop_type", crop_type)
                 

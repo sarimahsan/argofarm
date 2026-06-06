@@ -95,6 +95,7 @@ def test_get_scan_statistics(mock_query):
         [{'count': 15}], # Total scans
         [{'status': 'Diseased', 'count': 10}, {'status': 'Healthy', 'count': 5}], # Status distribution
         [{'crop_type': 'Wheat', 'count': 15}], # Crop distribution
+        [{'disease': 'Wheat Rust', 'count': 10}], # Disease distribution
         [{'avg_confidence': 90.5}] # Average confidence
     ]
     
@@ -103,8 +104,9 @@ def test_get_scan_statistics(mock_query):
     assert stats['total_scans'] == 15
     assert len(stats['status_distribution']) == 2
     assert stats['crop_distribution'][0]['crop_type'] == 'Wheat'
+    assert len(stats['disease_distribution']) == 1
     assert stats['average_confidence'] == 90.5
-    assert mock_query.call_count == 4
+    assert mock_query.call_count == 5
 
 @patch('models.queries.execute_insert')
 def test_create_chat_message(mock_insert):

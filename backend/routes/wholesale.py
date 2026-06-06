@@ -75,7 +75,7 @@ def analyze_wholesale_deal(payload):
             "3. Retail Profit Potential: Estimate standard markups when sold in urban retail markets (like local vegetable vendors, fruit shops, or supermarkets) and how they can manage logistical/freight overhead.\n"
             "4. AI Negotiation Tactics: Provide 3 strategic, highly respectful, and persuasive bargaining points (in Urdu Noto Nastaliq script if lang is 'ur', otherwise English) that the buyer can use to bargain with the farmer over WhatsApp.\n"
             "Write the response directly in the requested language (either English or Urdu). "
-            "Use clear Markdown formatting with H3 headers, bold accents, and bullet points. Keep it highly realistic and trade-focused."
+            "Use clear Markdown formatting with H3 headers, bold accents, and bullet points. Keep it highly realistic, trade-focused, and under 150 words total (4-5 sentences max)."
         )
         
         user_prompt = (
@@ -96,7 +96,7 @@ def analyze_wholesale_deal(payload):
         
         # Call Groq AI completions engine
         logger.debug("Dispatching request to Groq client B2B completions...")
-        ai_response = call_groq_completions(messages, max_tokens=1000, temperature=0.6)
+        ai_response = call_groq_completions(messages, max_tokens=350, temperature=0.6)
         
         # Fallback offline generator if Groq completions returns empty or fails
         if not ai_response:
@@ -226,21 +226,13 @@ def suggest_price(payload):
             f"Return ONLY a JSON object with the pricing recommendation."
         )
 
-        gemini_resp = call_gemini(prompt, system_instruction=system_instruction, temperature=0.3, max_tokens=600, json_mode=True)
+        gemini_resp = call_gemini(prompt, system_instruction=system_instruction, temperature=0.3, max_tokens=800, json_mode=True)
 
         parsed = None
         if gemini_resp:
             try:
-                # Strip any markdown wrapper
-                clean = gemini_resp.strip()
-                if clean.startswith("```json"):
-                    clean = clean[7:]
-                if clean.startswith("```"):
-                    clean = clean[3:]
-                if clean.endswith("```"):
-                    clean = clean[:-3]
-                clean = clean.strip()
-
+                from utils.gemini_client import extract_json_from_text
+                clean = extract_json_from_text(gemini_resp)
                 parsed = _json.loads(clean)
                 logger.info(f"✅ Gemini price suggestion parsed: {parsed.get('suggested_price')}")
             except Exception as parse_err:

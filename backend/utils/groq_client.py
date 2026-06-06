@@ -52,3 +52,46 @@ def call_groq_completions(messages, model_name=None, temperature=0.7, max_tokens
         print(f"❌ Exception calling Groq API: {e}")
         
     return None
+
+
+def call_groq_transcription(file_bytes, filename, mime_type="audio/webm"):
+    """
+    Call Groq Audio Transcriptions API using whisper-large-v3.
+    
+    Args:
+        file_bytes (bytes): The audio file bytes.
+        filename (str): The filename (e.g., 'audio.webm').
+        mime_type (str): The MIME type of the file.
+        
+    Returns:
+        str: Transcribed text, or None if failed.
+    """
+    api_key = os.getenv('GROQ_API_KEY')
+    if not api_key:
+        print("⚠️ GROQ_API_KEY is not set.")
+        return None
+        
+    url = "https://api.groq.com/openai/v1/audio/transcriptions"
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+    files = {
+        "file": (filename, file_bytes, mime_type)
+    }
+    data = {
+        "model": "whisper-large-v3",
+        "response_format": "json"
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, files=files, data=data, timeout=30)
+        if response.ok:
+            resp_data = response.json()
+            return resp_data.get("text")
+        else:
+            print(f"❌ Groq Transcription API Error: Status {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"❌ Exception calling Groq Transcription API: {e}")
+        
+    return None
+

@@ -30,7 +30,6 @@ export async function mountChat(container) {
     <div class="chat-main" id="chatMain">
       <header class="chat-header">
         <div class="chat-header-left">
-          <button class="icon-btn mobile-hamburger" id="chatMobileMenu" type="button" style="display:none;"><i class="fas fa-bars"></i></button>
           <div class="chat-bot-avatar"><i class="fas fa-robot"></i></div>
           <div>
             <div style="font-weight:600;font-size:13px;">CropMind AI</div>
@@ -46,7 +45,7 @@ export async function mountChat(container) {
           </div>
           <button class="icon-btn" id="audioToggle" type="button" title="Audio On"><i class="fas fa-volume-high" style="color:var(--accent);"></i></button>
           <button class="icon-btn" id="toggleHistoryBtn" type="button" title="Chat History"><i class="fas fa-history"></i></button>
-          <button class="icon-btn" id="copilotCloseBtn" type="button" title="Close Drawer"><i class="fas fa-xmark"></i></button>
+          <button class="icon-btn" id="copilotCloseBtn" type="button" title="Close Drawer" style="font-weight:900;"><i class="fas fa-times" style="font-size:16px;"></i></button>
         </div>
       </header>
 
@@ -56,6 +55,7 @@ export async function mountChat(container) {
           <div class="welcome-pill">
             <button class="pill-btn" type="button" id="welcomeUploadBtn" title="Upload" style="margin-right:8px;"><i class="fas fa-plus"></i></button>
             <input type="text" class="pill-input" id="welcomeInput" placeholder="Ask CropMind...">
+            <button class="pill-btn mic-btn" id="welcomeMicBtn" type="button" title="Speak (Urdu/English)" style="margin-right:8px;"><i class="fas fa-microphone"></i></button>
             <div class="welcome-model-pill" style="display:flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(255,255,255,0.06);border-radius:12px;font-size:11px;font-weight:500;color:var(--fg-muted);margin-right:10px;white-space:nowrap;flex-shrink:0;">
               <span>Llama 3.2 Vision</span> <i class="fas fa-chevron-down" style="font-size:8px;"></i>
             </div>
@@ -66,14 +66,33 @@ export async function mountChat(container) {
       <div class="chat-messages-area" id="chatMessages"></div>
 
       <div class="chat-input-bar" id="chatInputBar">
-        <div class="chat-input-inner" id="chatInputInner">
-          <input type="file" id="imageUpload" accept="image/*" style="display:none;">
-          <div class="upload-box" id="attachBtn" title="Upload image">
-            <i class="fas fa-cloud-arrow-up"></i>
-            <span class="upload-box-text">Upload</span>
+        <div class="chat-input-inner" id="chatInputInner" style="position: relative;">
+          
+          <div class="chat-input-widgets" id="chatInputWidgets" style="display: flex; align-items: center; width: 100%;">
+            <input type="file" id="imageUpload" accept="image/*" style="display:none;">
+            <div class="upload-box" id="attachBtn" title="Upload image">
+              <i class="fas fa-cloud-arrow-up"></i>
+              <span class="upload-box-text">Upload</span>
+            </div>
+            <input type="text" class="pill-input" id="chatInput" placeholder="Describe your crop issue or ask a question...">
+            <button class="pill-btn mic-btn" id="micBtn" type="button" title="Speak (Urdu/English)" style="margin-right:4px;"><i class="fas fa-microphone"></i></button>
+            <button class="pill-btn" id="sendBtn" type="button" title="Send" style="color:var(--accent);"><i class="fas fa-paper-plane"></i></button>
           </div>
-          <input type="text" class="pill-input" id="chatInput" placeholder="Describe your crop issue or ask a question...">
-          <button class="pill-btn" id="sendBtn" type="button" title="Send" style="color:var(--accent);"><i class="fas fa-paper-plane"></i></button>
+
+          <div class="recording-widgets-overlay" id="recordingOverlay" style="display: none; align-items: center; justify-content: space-between; width: 100%; position: absolute; left: 0; top: 0; bottom: 0; right: 0; background: var(--bg-elevated); padding: 0 16px; border-radius: inherit; z-index: 10;">
+            <div style="display:flex;align-items:center;gap:16px;flex-grow:1;">
+              <div class="pulse-dot red-pulse" style="width:10px;height:10px;background:#ef4444;border-radius:50%;flex-shrink:0;"></div>
+              <span style="font-size:13px;font-weight:700;color:#ef4444;min-width:32px;" id="recordingTimer">0:00</span>
+              <div class="voice-wave" style="flex-grow:1;max-width:180px;">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button class="record-action-btn cancel" id="cancelRecordBtn" type="button" title="Cancel recording"><i class="fas fa-trash-can"></i></button>
+              <button class="record-action-btn stop" id="stopRecordBtn" type="button" title="Stop and Transcribe"><i class="fas fa-circle-stop"></i></button>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -85,12 +104,7 @@ export async function mountChat(container) {
     container.querySelector('#welcomeName').textContent = user.name || 'User';
   }
 
-  // Mobile menu
-  const mobileMenuBtn = container.querySelector('#chatMobileMenu');
-  if (window.innerWidth <= 768) mobileMenuBtn.style.display = 'flex';
-  mobileMenuBtn.addEventListener('click', () => {
-    openMobileMenu();
-  });
+
 
   // Lang toggle
   container.querySelector('#langEn').addEventListener('click', () => switchLangChat('en'));
@@ -132,7 +146,14 @@ export async function mountChat(container) {
   });
   container.querySelector('#imageUpload').addEventListener('change', handleImageUpload);
 
-  // Voice recording removed
+  // Voice recording events
+  container.querySelector('#micBtn').addEventListener('click', startRecording);
+  container.querySelector('#welcomeMicBtn').addEventListener('click', () => {
+    activateChat();
+    startRecording();
+  });
+  container.querySelector('#cancelRecordBtn').addEventListener('click', () => stopRecording(false));
+  container.querySelector('#stopRecordBtn').addEventListener('click', () => stopRecording(true));
 
   // Init chat
   initChatWelcome();
@@ -183,6 +204,16 @@ function activateChat() {
   main.classList.add('chat-active');
 }
 
+function scrollToBottom() {
+  const msgs = chatContainer?.querySelector('#chatMessages');
+  if (msgs) {
+    msgs.scrollTop = msgs.scrollHeight;
+    setTimeout(() => {
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    }, 40);
+  }
+}
+
 // ====== MESSAGES ======
 function addBotMessage(text, streaming = true) {
   activateChat();
@@ -199,12 +230,27 @@ function addBotMessage(text, streaming = true) {
   timeDiv.className = 'msg-time';
   timeDiv.textContent = time;
 
+  const speakBtn = document.createElement('button');
+  speakBtn.className = 'msg-speak-btn';
+  speakBtn.type = 'button';
+  speakBtn.title = 'Read aloud';
+  speakBtn.innerHTML = '<i class="fas fa-volume-high"></i>';
+  speakBtn.addEventListener('click', () => {
+    const state = getState();
+    speakText(text, state.currentLang);
+  });
+
+  const metaRow = document.createElement('div');
+  metaRow.className = 'msg-meta-row';
+  metaRow.appendChild(timeDiv);
+  metaRow.appendChild(speakBtn);
+
   const wrap = document.createElement('div');
   wrap.appendChild(bubble);
-  wrap.appendChild(timeDiv);
+  wrap.appendChild(metaRow);
   row.appendChild(wrap);
   msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
+  scrollToBottom();
 
   if (streaming) {
     const words = text.split(' ');
@@ -226,11 +272,39 @@ function addBotHTML(html) {
   activateChat();
   const msgs = chatContainer.querySelector('#chatMessages');
   const time = getTimeString();
+
   const row = document.createElement('div');
   row.className = 'msg-row bot';
-  row.innerHTML = `<div><div class="msg-bubble">${html}</div><div class="msg-time">${time}</div></div>`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = html;
+
+  const timeDiv = document.createElement('div');
+  timeDiv.className = 'msg-time';
+  timeDiv.textContent = time;
+
+  const speakBtn = document.createElement('button');
+  speakBtn.className = 'msg-speak-btn';
+  speakBtn.type = 'button';
+  speakBtn.title = 'Read aloud';
+  speakBtn.innerHTML = '<i class="fas fa-volume-high"></i>';
+  speakBtn.addEventListener('click', () => {
+    const state = getState();
+    speakText(bubble.textContent || bubble.innerText, state.currentLang);
+  });
+
+  const metaRow = document.createElement('div');
+  metaRow.className = 'msg-meta-row';
+  metaRow.appendChild(timeDiv);
+  metaRow.appendChild(speakBtn);
+
+  const wrap = document.createElement('div');
+  wrap.appendChild(bubble);
+  wrap.appendChild(metaRow);
+  row.appendChild(wrap);
   msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
+  scrollToBottom();
 }
 
 function addUserMessage(text, type = 'text') {
@@ -249,7 +323,7 @@ function addUserMessage(text, type = 'text') {
 
   row.innerHTML = `<div>${content}<div class="msg-time">${time}</div></div>`;
   msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
+  scrollToBottom();
 }
 
 function addTyping() {
@@ -259,7 +333,7 @@ function addTyping() {
   row.id = 'typingIndicator';
   row.innerHTML = '<div class="msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
   msgs.appendChild(row);
-  msgs.scrollTop = msgs.scrollHeight;
+  scrollToBottom();
 }
 
 function removeTyping() {
@@ -932,7 +1006,124 @@ function renderCropRecommendForm() {
   }, 100);
 }
 
-// Voice recording removed
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingTimerInterval = null;
+let recordingDurationSec = 0;
+
+async function startRecording() {
+  audioChunks = [];
+  recordingDurationSec = 0;
+  
+  const isEn = getState().currentLang === 'en';
+  
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    let mimeType = 'audio/webm';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = 'audio/ogg';
+    }
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = ''; 
+    }
+    
+    mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+    
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(track => track.stop());
+      
+      if (audioChunks.length === 0) {
+        showToast(isEn ? 'No audio captured' : 'کوئی آواز ریکارڈ نہیں ہوئی');
+        return;
+      }
+      
+      const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      
+      addTyping();
+      showToast(isEn ? 'Transcribing...' : 'ترجمہ ہو رہا ہے...');
+      
+      const { apiTranscribeAudio } = await import('../api.js');
+      const response = await apiTranscribeAudio(audioBlob);
+      removeTyping();
+      
+      if (response && response.status === 'success' && response.text) {
+        const chatInput = chatContainer.querySelector('#chatInput');
+        if (chatInput) {
+          chatInput.value = response.text;
+          chatInput.focus();
+        }
+        showToast(isEn ? 'Transcribed!' : 'ترجمہ مکمل!');
+      } else {
+        showToast(isEn ? 'Transcription failed' : 'ترجمہ ناکام رہا');
+      }
+    };
+    
+    mediaRecorder.start(250);
+    
+    const widgets = chatContainer.querySelector('#chatInputWidgets');
+    const overlay = chatContainer.querySelector('#recordingOverlay');
+    if (widgets && overlay) {
+      widgets.style.display = 'none';
+      overlay.style.display = 'flex';
+    }
+    
+    const timerText = chatContainer.querySelector('#recordingTimer');
+    if (timerText) timerText.textContent = '0:00';
+    
+    recordingTimerInterval = setInterval(() => {
+      recordingDurationSec++;
+      const min = Math.floor(recordingDurationSec / 60);
+      const sec = recordingDurationSec % 60;
+      if (timerText) {
+        timerText.textContent = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+      }
+      if (recordingDurationSec >= 60) {
+        stopRecording(true);
+      }
+    }, 1000);
+    
+  } catch (err) {
+    console.error('Microphone access denied:', err);
+    showToast(isEn ? 'Microphone access denied' : 'مائیکروفون تک رسائی کی اجازت نہیں ہے');
+  }
+}
+
+function stopRecording(shouldSave = true) {
+  const isEn = getState().currentLang === 'en';
+  if (shouldSave && recordingDurationSec < 1) {
+    showToast(isEn ? 'Recording too short' : 'ریکارڈنگ بہت مختصر ہے');
+    shouldSave = false;
+  }
+
+  if (recordingTimerInterval) {
+    clearInterval(recordingTimerInterval);
+    recordingTimerInterval = null;
+  }
+  
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    if (!shouldSave) {
+      mediaRecorder.onstop = () => {
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      };
+    }
+    mediaRecorder.stop();
+  }
+  
+  const widgets = chatContainer.querySelector('#chatInputWidgets');
+  const overlay = chatContainer.querySelector('#recordingOverlay');
+  if (widgets && overlay) {
+    widgets.style.display = 'flex';
+    overlay.style.display = 'none';
+  }
+}
+
 
 // ====== CHAT HISTORY ======
 async function populateChatHistory() {

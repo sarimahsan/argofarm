@@ -289,7 +289,7 @@ def get_ai_calendar(payload):
         system_prompt = (
             "You are an elite, senior Pakistani Agronomist and Crop Scientist. "
             "Provide highly legitimate, scientifically accurate, and seasonal farming advice for the crop in the requested month. "
-            "Keep the output extremely professional, structured, and under 250 words. Focus on Pakistan agricultural seasons (Rabi/Kharif)."
+            "Keep the output extremely short, structured, and under 120 words / 4-5 sentences max."
         )
         
         user_prompt = f"Provide detailed agronomy calendar guidelines for cultivating '{crop}' during '{month}' in Pakistan."
@@ -302,7 +302,7 @@ def get_ai_calendar(payload):
         ]
         
         # Call Groq completion engine
-        ai_response = call_groq_completions(messages, max_tokens=600, temperature=0.6)
+        ai_response = call_groq_completions(messages, max_tokens=250, temperature=0.6)
         if not ai_response:
             return jsonify({
                 'status': 'error',
@@ -365,6 +365,7 @@ def post_ai_diagnose(payload, post_id):
             "Diagnose the following farmer's field inquiry. Provide legitimate, highly practical scientific advice, "
             "preventative spray options (both organic and pesticide), and next steps. "
             "Write the response in an engaging, empathetic, structured layout. Highlight the diagnosis and remedy clearly. "
+            "Keep the response concise and structured, under 150 words total (4-5 sentences max). "
             "Add a warm signature: '⚡ Dr. Crop AI Diagnostic Clinic'."
         )
         
@@ -375,7 +376,7 @@ def post_ai_diagnose(payload, post_id):
             {"role": "user", "content": user_prompt}
         ]
         
-        ai_response = call_groq_completions(messages, max_tokens=700, temperature=0.7)
+        ai_response = call_groq_completions(messages, max_tokens=300, temperature=0.7)
         if not ai_response:
             return jsonify({
                 'status': 'error',

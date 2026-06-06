@@ -1,7 +1,7 @@
 import pytest
 import os
 from unittest.mock import patch, MagicMock
-from utils.groq_client import call_groq_completions
+from utils.groq_client import call_groq_completions, call_groq_transcription
 
 @patch('utils.groq_client.requests.post')
 def test_call_groq_completions_success(mock_post):
@@ -69,3 +69,37 @@ def test_call_groq_completions_exception_handling(mock_post):
     response = call_groq_completions(messages)
     
     assert response is None
+
+
+@patch('utils.groq_client.requests.post')
+def test_call_groq_transcription_success(mock_post):
+    """Test that call_groq_transcription successfully sends file bytes and parses the text response"""
+    mock_resp = MagicMock()
+    mock_resp.ok = True
+    mock_resp.json.return_value = {'text': 'یہ ایک آزمائشی ریکارڈنگ ہے۔'}
+    mock_post.return_value = mock_resp
+
+    response = call_groq_transcription(b'dummy_audio_bytes', 'audio.webm', 'audio/webm')
+
+    assert response == 'یہ ایک آزمائشی ریکارڈنگ ہے۔'
+    mock_post.assert_called_once()
+    url, kwargs = mock_post.call_args
+    assert url[0] == "https://api.groq.com/openai/v1/audio/transcriptions"
+    assert kwargs['files']['file'][0] == 'audio.webm'
+    assert kwargs['files']['file'][2] == 'audio/webm'
+    assert kwargs['data']['model'] == 'whisper-large-v3'
+
+
+@patch('utils.groq_client.requests.post')
+def test_call_groq_transcription_failure(mock_post):
+    """Test call_groq_transcription returns None gracefully on failure status code"""
+    mock_resp = MagicMock()
+    mock_resp.ok = False
+    mock_resp.status_code = 400
+    mock_post.return_value = mock_resp
+
+    response = call_groq_transcription(b'dummy_audio_bytes', 'audio.webm')
+
+    assert response is None
+    mock_post.assert_called_once()
+

@@ -5,6 +5,15 @@ import { showToast } from './utils.js';
 
 const API_BASE = '/api/v1';
 
+// In-memory cache for API responses
+const apiCache = new Map();
+const CACHE_TTL = 300000; // 5 minutes TTL
+
+export function clearApiCache() {
+  console.log('[Cache] Clearing all cached GET responses.');
+  apiCache.clear();
+}
+
 function getHeaders(isJson = true) {
   const headers = {};
   const { authToken } = getState();
@@ -16,6 +25,42 @@ function getHeaders(isJson = true) {
 export async function apiFetch(endpoint, options = {}) {
   const { authToken } = getState();
   const isFormData = options.body instanceof FormData;
+
+  // Validate token exists for protected routes
+  if (!endpoint.includes('/auth/') && !endpoint.includes('/register') && !endpoint.includes('/login')) {
+    if (!authToken) {
+      clearUser();
+      if (window.location.hash !== '#landing') {
+        window.location.hash = '#landing';
+      }
+      return null;
+    }
+  }
+
+  const method = (options.method || 'GET').toUpperCase();
+  const cacheableEndpoints = [
+    '/community/ai-calendar',
+    '/planner/generate',
+    '/wholesale/analyze',
+    '/wholesale/suggest-price'
+  ];
+  const isCacheable = method === 'GET' || cacheableEndpoints.some(e => endpoint.startsWith(e));
+
+  // Invalidate cache on any state-changing operations
+  if (!isCacheable) {
+    console.log(`[Cache Invalidation] Clearing cache due to write operation: ${method} ${endpoint}`);
+    apiCache.clear();
+  }
+
+  // Check cache for GET or cacheable POST requests
+  const cacheKey = `${authToken || ''}:${endpoint}?${options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : ''}`;
+  if (isCacheable) {
+    const cached = apiCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+      console.log(`[Cache Hit] Returning cached response for: ${endpoint}`);
+      return cached.data;
+    }
+  }
 
   const config = {
     ...options,
@@ -29,18 +74,31 @@ export async function apiFetch(endpoint, options = {}) {
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, config);
 
+    // Handle 401 - Invalid/Expired token
     if (response.status === 401) {
-      clearUser();
-      showToast('Session expired. Please login again.');
-      window.location.hash = '#landing';
-      return null;
+      // Only clear and redirect if it's not a login/register request
+      if (!endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
+        clearUser();
+        showToast('Session expired. Please login again.');
+        window.location.hash = '#landing';
+      }
+      const data = await response.json();
+      return data;
     }
 
     const data = await response.json();
 
     if (!response.ok) {
-      showToast(data.message || 'Request failed');
-      return null;
+      if (data.message) showToast(data.message);
+      return data;
+    }
+
+    // Cache the successful response
+    if (isCacheable && data) {
+      apiCache.set(cacheKey, {
+        data,
+        timestamp: Date.now()
+      });
     }
 
     return data;
@@ -84,6 +142,12 @@ export async function apiUpdateProfile(data) {
   });
 }
 
+export async function apiLogout() {
+  return apiFetch('/auth/logout', {
+    method: 'POST',
+  });
+}
+
 // ====== DASHBOARD ENDPOINTS ======
 export async function apiGetAnalytics() {
   return apiFetch('/dashboard/analytics');
@@ -123,6 +187,24 @@ export async function apiSendChat(message, chatSessionId, language) {
   });
 }
 
+export async function apiTranscribeAudio(audioBlob) {
+  const mime = audioBlob.type || 'audio/webm';
+  const mainType = mime.split(';')[0];
+  let ext = 'webm';
+  if (mainType.includes('ogg')) ext = 'ogg';
+  else if (mainType.includes('mp4') || mainType.includes('m4a')) ext = 'm4a';
+  else if (mainType.includes('wav')) ext = 'wav';
+  else if (mainType.includes('mpeg') || mainType.includes('mp3')) ext = 'mp3';
+
+  const formData = new FormData();
+  formData.append('audio', audioBlob, `audio.${ext}`);
+  return apiFetch('/chat/transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+
 export async function apiRecommendCrop(data) {
   return apiFetch('/chat/recommend_crop', {
     method: 'POST',
@@ -134,6 +216,9 @@ export async function apiRecommendCrop(data) {
 export async function apiScanImage(formData) {
   const { authToken } = getState();
   const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+
+  // Clear cache on new scans
+  clearApiCache();
 
   try {
     const response = await fetch(`${API_BASE}/scan/predict`, {

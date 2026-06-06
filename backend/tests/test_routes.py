@@ -325,3 +325,26 @@ def test_update_profile_success(mock_update, mock_get_user, client, app):
     assert data['data']['user']['name'] == 'Ahmed Khan Updated'
     assert data['data']['user']['region'] == 'Multan'
     assert data['data']['user']['crop_types'] == ['Wheat', 'Sugarcane']
+
+
+@patch('utils.groq_client.call_groq_transcription')
+def test_transcribe_audio_success(mock_transcribe, client, app):
+    """Test that transcribe_audio route successfully handles multipart audio uploads"""
+    mock_transcribe.return_value = "یہ ایک آزمائشی آواز ہے۔"
+    
+    headers = get_auth_headers(app)
+    data = {
+        'audio': (BytesIO(b"fake_webm_bytes"), 'audio.webm')
+    }
+    response = client.post(
+        '/api/v1/chat/transcribe',
+        data=data,
+        content_type='multipart/form-data',
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    res_data = response.get_json()
+    assert res_data['status'] == 'success'
+    assert res_data['text'] == "یہ ایک آزمائشی آواز ہے۔"
+

@@ -119,12 +119,17 @@ def login():
             'message': str(e)
         }), 500
 
-@auth_bp.route('/logout', methods=['POST'])
+@auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
 def logout():
     """Logout user"""
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     return jsonify({
         'status': 'success',
-        'message': 'Logged out successfully'
+        'message': 'Logged out successfully',
+        'data': None
     }), 200
 
 @auth_bp.route('/profile', methods=['GET'])

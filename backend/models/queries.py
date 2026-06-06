@@ -139,6 +139,13 @@ def get_scan_statistics(user_id):
         WHERE user_id = %s GROUP BY crop_type
     """, (user_id,))
     stats['crop_distribution'] = result if result else []
+
+    # Disease distribution
+    result = execute_query("""
+        SELECT disease, COUNT(*) as count FROM scans 
+        WHERE user_id = %s GROUP BY disease
+    """, (user_id,))
+    stats['disease_distribution'] = result if result else []
     
     # Average confidence
     result = execute_query("""

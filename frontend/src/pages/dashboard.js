@@ -245,7 +245,7 @@ async function loadDashboardData(main) {
   const result = await apiGetAnalytics();
   if (!result || result.status !== 'success') return;
 
-  const { user, summary, recent_scans, crop_stats } = result.data;
+  const { user, summary, recent_scans, disease_stats } = result.data;
   const currentLang = getState().currentLang || 'en';
   const isUr = currentLang === 'ur';
 
@@ -258,12 +258,8 @@ async function loadDashboardData(main) {
   main.querySelector('#statScans').textContent = summary.total_scans || 0;
   main.querySelector('#statCrops').textContent = summary.crop_types_count || 0;
 
-  const diseased = recent_scans.filter(s => s.status === 'Diseased').length;
-  main.querySelector('#statDiseases').textContent = diseased;
-
-  const healthy = recent_scans.filter(s => s.status === 'Healthy').length;
-  const rate = recent_scans.length > 0 ? Math.round((healthy / recent_scans.length) * 100) : 0;
-  main.querySelector('#statHealthy').textContent = rate + '%';
+  main.querySelector('#statDiseases').textContent = summary.diseased_count || 0;
+  main.querySelector('#statHealthy').textContent = (summary.healthy_rate || 0) + '%';
 
   // Table
   const tbody = main.querySelector('#dashTableBody');
@@ -291,7 +287,7 @@ async function loadDashboardData(main) {
   // Map
   setTimeout(() => initMap(main), 80);
   // Chart
-  setTimeout(() => initChart(main, crop_stats || []), 100);
+  setTimeout(() => initChart(main, disease_stats || []), 100);
 }
 
 async function initMap(main) {
@@ -401,12 +397,12 @@ async function initMap(main) {
   L.control.layers(null, overlays, { collapsed: false, position: 'topright' }).addTo(mapInstance);
 }
 
-function initChart(main, cropStats) {
+function initChart(main, diseaseStats) {
   const canvas = main.querySelector('#diseaseChart');
   if (!canvas || typeof Chart === 'undefined') return;
 
-  const labels = cropStats.length > 0 ? cropStats.map(c => c.crop_type) : ['Wheat', 'Rice', 'Cotton', 'Maize', 'Sugarcane'];
-  const counts = cropStats.length > 0 ? cropStats.map(c => c.count) : [12, 8, 5, 4, 3];
+  const labels = diseaseStats.length > 0 ? diseaseStats.map(d => d.disease) : ['Healthy (صحت مند)', 'Late Blight (جھلساؤ)', 'Leaf Rust (کنگی)', 'Rice Blast (بلاسٹ)'];
+  const counts = diseaseStats.length > 0 ? diseaseStats.map(d => d.count) : [10, 3, 2, 1];
 
   chartInstance = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
@@ -414,7 +410,7 @@ function initChart(main, cropStats) {
       labels,
       datasets: [{
         data: counts,
-        backgroundColor: ['#2ecc40', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
+        backgroundColor: ['#2ecc40', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'],
         borderWidth: 2,
         borderColor: 'rgba(6,13,6,0.8)',
       }],

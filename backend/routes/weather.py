@@ -140,14 +140,9 @@ def generate_gemini_advisory(weather_data, region, lang='en'):
 
     system_instruction = (
         "You are 'AgroWeather AI', an elite agricultural meteorologist and crop protection specialist in Pakistan. "
-        "Analyze the provided real-time weather data and 7-day forecast, then generate a highly practical, "
-        "actionable crop advisory for the farmer. Focus on:\n"
-        "1. Immediate weather impact on standing crops (irrigation, pest/disease risk, heat/cold stress)\n"
-        "2. What protective measures the farmer should take in the next 48 hours\n"
-        "3. 7-day outlook — when to spray, irrigate, or harvest based on the forecast\n"
-        "Keep it concise (3-5 bullet points), warm, and highly professional. "
-        "If the weather is dangerous (storm, extreme heat >42°C, flooding), emphasize urgency.\n"
-        f"Respond ENTIRELY in {'Urdu (اردو نستعلیق)' if lang == 'ur' else 'English'}."
+        "Analyze the provided weather data and generate a highly concise crop advisory for the farmer.\n\n"
+        "IMPORTANT: Your response MUST be extremely short — exactly 1 to 2 sentences max (no bullet points, no markdown headers). "
+        f"Respond ENTIRELY in {'Urdu (اردو)' if lang == 'ur' else 'English'}."
     )
 
     prompt = (
@@ -160,7 +155,7 @@ def generate_gemini_advisory(weather_data, region, lang='en'):
         f"Generate a targeted crop protection advisory for farmers in {region}."
     )
 
-    advisory = call_gemini(prompt, system_instruction=system_instruction, temperature=0.6, max_tokens=600)
+    advisory = call_gemini(prompt, system_instruction=system_instruction, temperature=0.6, max_tokens=200)
     return advisory
 
 

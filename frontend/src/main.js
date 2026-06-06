@@ -14,11 +14,26 @@ import { mountPlanner } from './pages/planner.js';
 import { mountWholesale } from './pages/wholesale.js';
 import { renderSidebar } from './components/sidebar.js';
 import { openModal } from './components/modal.js';
-import { apiGetScan } from './api.js';
+import { apiGetScan, apiGetProfile } from './api.js';
 import { showToast, formatDate, parseMarkdown } from './utils.js';
 
 // Initialize state from localstorage
 initState();
+
+// Verify token validity on app load
+const initialState = getState();
+if (initialState.authToken) {
+  apiGetProfile().then(result => {
+    if (!result || result.status !== 'success') {
+      // Token is invalid, clear it
+      import('./state.js').then(({ clearUser }) => {
+        clearUser();
+      });
+    }
+  }).catch(() => {
+    // Network error, keep token for now but user will be redirected on first 401
+  });
+}
 
 // Setup App Layout container
 const appEl = document.getElementById('app');

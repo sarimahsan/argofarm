@@ -43,8 +43,12 @@ def create_app(config_name='development'):
     if config_name == 'production':
         app.config['DEBUG'] = False
     
-    # Enable CORS
-    CORS(app)
+    # Enable CORS with JWT support
+    CORS(app, 
+         resources={r"/api/*": {"origins": "*"}},
+         allow_headers=["Content-Type", "Authorization"],
+         expose_headers=["Content-Type"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
     
     # Initialize database
     init_database()

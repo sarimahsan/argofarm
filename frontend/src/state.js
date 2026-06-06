@@ -42,10 +42,15 @@ export function initState() {
 }
 
 export function setUser(user, token) {
+  if (!token || !user) {
+    console.warn('setUser called with invalid data', { user, token });
+    return;
+  }
   state.user = user;
   state.authToken = token;
   localStorage.setItem('authToken', token);
   localStorage.setItem('user', JSON.stringify(user));
+  state._listeners.forEach(fn => fn(state));
 }
 
 export function clearUser() {
@@ -53,6 +58,7 @@ export function clearUser() {
   state.authToken = null;
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
+  state._listeners.forEach(fn => fn(state));
 }
 
 export function setTheme(theme) {

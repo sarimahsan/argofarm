@@ -76,7 +76,16 @@ export function renderSidebar(container) {
     });
   });
 
-  nav.querySelector('[data-action="logout"]').addEventListener('click', () => {
+  nav.querySelector('[data-action="logout"]').addEventListener('click', async () => {
+    const btn = nav.querySelector('[data-action="logout"]');
+    btn.disabled = true;
+    
+    // Call backend logout
+    import('../api.js').then(async (api) => {
+      await api.apiLogout();
+    });
+    
+    // Clear local state
     clearUser();
     showToast('Logged out successfully');
     closeMobileMenu();

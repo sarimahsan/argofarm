@@ -10,6 +10,55 @@ logger = logging.getLogger(__name__)
 
 chat_bp = Blueprint('chat', __name__, url_prefix='/api/v1/chat')
 
+@chat_bp.route('/transcribe', methods=['POST'])
+@token_required
+def transcribe_audio(payload):
+    """
+    Transcribe uploaded audio file using Groq Whisper model.
+    """
+    try:
+        from utils.groq_client import call_groq_transcription
+        
+        if 'audio' not in request.files:
+            return jsonify({
+                'status': 'error',
+                'message': 'No audio file uploaded'
+            }), 400
+            
+        audio_file = request.files['audio']
+        if audio_file.filename == '':
+            return jsonify({
+                'status': 'error',
+                'message': 'Empty filename'
+            }), 400
+            
+        file_bytes = audio_file.read()
+        filename = audio_file.filename or 'audio.webm'
+        mime_type = audio_file.content_type or 'audio/webm'
+        
+        logger.info(f"Transcribing audio file: {filename} ({len(file_bytes)} bytes), mime_type={mime_type}")
+        
+        transcription_text = call_groq_transcription(file_bytes, filename, mime_type)
+        
+        if not transcription_text:
+            return jsonify({
+                'status': 'error',
+                'message': 'Audio transcription failed. Please try again.'
+            }), 500
+            
+        return jsonify({
+            'status': 'success',
+            'text': transcription_text
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error in audio transcription: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+
 @chat_bp.route('/send', methods=['POST'])
 @token_required
 def send_message(payload):
@@ -114,7 +163,7 @@ def send_message(payload):
         
         # 4. Call Groq
         current_app.logger.info(f"Calling Groq LLM for user {user_id} in session {chat_session_id}")
-        assistant_message = call_groq_completions(groq_messages)
+        assistant_message = call_groq_completions(groq_messages, max_tokens=350, temperature=0.6)
         
         # 5. Fallback if Groq API is not set up or fails
         if not assistant_message:
@@ -205,17 +254,18 @@ def recommend_crop_route(payload):
             f"Based on inputs: Nitrogen (N)={n}, Phosphorus (P)={p}, Potassium (K)={k}, "
             f"soil pH={ph}, Rainfall={rain}mm, Temp={temp}C, Humidity={humid}%. "
             f"The Random Forest model predicted the optimal crop to grow is: '{crop_display}'. "
-            f"Provide a highly detailed, professional agricultural yield plan (3-4 bullet points or sentences). "
+            f"Provide a highly concise, professional agricultural yield plan (3-4 bullet points or sentences max). "
             f"Focus on fertilizer scheduling (how much Urea/DAP to apply), irrigation tips, and typical yield expectations in Pakistan. "
+            f"Keep the advisory brief (under 120 words total). "
             f"Respond completely in {'Urdu (اردو)' if language == 'ur' else 'English'}."
         )
         
         groq_messages = [
-            {"role": "system", "content": "You are CropMind AI, a professional SaaS agricultural advisor helping farmers optimize crop yields."},
+            {"role": "system", "content": "You are CropMind AI, a professional SaaS agricultural advisor helping farmers optimize crop yields. Keep responses brief and structured."},
             {"role": "user", "content": prompt}
         ]
         
-        groq_advisory = call_groq_completions(groq_messages)
+        groq_advisory = call_groq_completions(groq_messages, max_tokens=250, temperature=0.5)
         
         if not groq_advisory:
             if language == 'ur':

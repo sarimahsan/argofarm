@@ -26,6 +26,19 @@ def get_analytics(payload):
         # Get recent scans
         recent_scans = get_user_scans(user_id, limit=5)
         
+        # Calculate stats from status_distribution
+        total = stats['total_scans']
+        healthy_count = 0
+        diseased_count = 0
+        for item in stats.get('status_distribution', []):
+            status_val = item.get('status')
+            if status_val == 'Healthy':
+                healthy_count = item.get('count', 0)
+            elif status_val == 'Diseased':
+                diseased_count = item.get('count', 0)
+                
+        healthy_rate = round((healthy_count / total) * 100) if total > 0 else 100
+        
         return jsonify({
             'status': 'success',
             'message': 'Dashboard analytics retrieved',
@@ -36,12 +49,13 @@ def get_analytics(payload):
                     'email': user['email'],
                 },
                 'summary': {
-                    'total_scans': stats['total_scans'],
-                    'healthy_rate': 0,  # Calculate from status_distribution if needed
+                    'total_scans': total,
+                    'healthy_rate': healthy_rate,
                     'crop_types_count': len(stats['crop_distribution']),
+                    'diseased_count': diseased_count,
                 },
                 'recent_scans': recent_scans or [],
-                'disease_stats': stats.get('status_distribution', []),
+                'disease_stats': stats.get('disease_distribution', []),
                 'crop_stats': stats.get('crop_distribution', []),
                 'status_stats': stats.get('status_distribution', []),
             }
@@ -232,23 +246,15 @@ def get_forecast(payload):
             prompt=user_prompt,
             system_instruction=system_instruction,
             temperature=0.3,
-            max_tokens=1000,
+            max_tokens=1024,
             json_mode=True
         )
         
         predictions_data = None
         if gemini_resp:
             try:
-                # Strip backticks if present
-                clean_resp = gemini_resp.strip()
-                if clean_resp.startswith("```json"):
-                    clean_resp = clean_resp[7:]
-                if clean_resp.startswith("```"):
-                    clean_resp = clean_resp[3:]
-                if clean_resp.endswith("```"):
-                    clean_resp = clean_resp[:-3]
-                clean_resp = clean_resp.strip()
-                
+                from utils.gemini_client import extract_json_from_text
+                clean_resp = extract_json_from_text(gemini_resp)
                 parsed = json.loads(clean_resp)
                 predictions_data = parsed.get("predictions")
                 logger.info(f"✅ Successfully retrieved {len(predictions_data)} outbreak predictions from Gemini")
