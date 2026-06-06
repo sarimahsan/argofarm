@@ -348,3 +348,16 @@ def test_transcribe_audio_success(mock_transcribe, client, app):
     assert res_data['status'] == 'success'
     assert res_data['text'] == "یہ ایک آزمائشی آواز ہے۔"
 
+
+@patch('routes.chat.execute_query')
+def test_chat_test_route_diagnostics(mock_execute_query, client):
+    """Test that the chat test diagnostics route runs and returns database/API statuses"""
+    mock_execute_query.return_value = [{'val': 1}]
+    
+    response = client.get('/api/v1/chat/test')
+    assert response.status_code == 200
+    res_data = response.get_json()
+    assert res_data['status'] == 'success'
+    assert 'diagnostics' in res_data
+    assert res_data['diagnostics']['database'] == 'connected'
+

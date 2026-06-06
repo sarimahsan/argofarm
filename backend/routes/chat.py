@@ -372,3 +372,44 @@ def get_sessions_route(payload):
         current_app.logger.exception("Error in chat route /sessions")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+@chat_bp.route('/test', methods=['GET'])
+def test_endpoint():
+    """
+    Robust test/diagnostics endpoint to check system status.
+    Verifies DB connectivity, Groq API configuration, and server status.
+    """
+    import os
+    from utils.database import execute_query
+    
+    status_info = {
+        'status': 'success',
+        'message': 'Chat service is active and responsive',
+        'diagnostics': {
+            'database': 'disconnected',
+            'groq_api': 'unconfigured',
+            'gemini_api': 'unconfigured'
+        }
+    }
+    
+    # Check database connectivity
+    try:
+        res = execute_query("SELECT 1 as val")
+        if res and len(res) > 0 and res[0].get('val') == 1:
+            status_info['diagnostics']['database'] = 'connected'
+    except Exception as e:
+        logger.error(f"Test endpoint DB connection check failed: {e}")
+        status_info['diagnostics']['database'] = f"error: {str(e)}"
+        
+    # Check Groq API configuration
+    groq_key = os.getenv('GROQ_API_KEY')
+    if groq_key:
+        status_info['diagnostics']['groq_api'] = 'configured'
+        
+    # Check Gemini API configuration
+    gemini_key = os.getenv('GEMINI_API_KEY')
+    if gemini_key:
+        status_info['diagnostics']['gemini_api'] = 'configured'
+        
+    return jsonify(status_info), 200
+

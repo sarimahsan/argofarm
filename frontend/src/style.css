@@ -951,6 +951,7 @@ body.sidebar-expanded .sidebar-btn-text {
 
 .pill-input {
   flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   color: var(--fg);
@@ -2619,11 +2620,22 @@ body.sidebar-expanded .sidebar-btn-text {
     padding: 0 6px 0 12px !important;
   }
   
-  .upload-box {
-    padding: 4px 8px !important;
+  .upload-box, .copilot-drawer .upload-box {
+    min-width: auto !important;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    border-style: solid !important;
+    border-width: 1.5px !important;
+    margin-right: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
   }
   
-  .upload-box-text {
+  .upload-box-text, .copilot-drawer .upload-box-text {
     display: none !important;
   }
 }
