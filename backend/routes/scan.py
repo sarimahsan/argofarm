@@ -256,9 +256,36 @@ def predict(payload):
                     crop_type = detected_crop
 
             disease = parsed.get("disease", "Unknown")
-            confidence = float(parsed.get("confidence", 85.0))
+            if not isinstance(disease, str):
+                disease = str(disease)
+
+            try:
+                confidence = float(parsed.get("confidence", 85.0))
+            except Exception:
+                confidence = 85.0
+
             status = parsed.get("status", "Diseased")
+            if not isinstance(status, str):
+                status = str(status)
+
             advisory_text = parsed.get("advisory", "Pathology detected. Consult expert.")
+            if isinstance(advisory_text, dict):
+                lines = []
+                for k, v in advisory_text.items():
+                    lines.append(f"**{k.replace('_', ' ').title()}**:")
+                    if isinstance(v, list):
+                        for item in v:
+                            lines.append(f"- {item}")
+                    elif isinstance(v, dict):
+                        for subk, subv in v.items():
+                            lines.append(f"  - **{subk.replace('_', ' ').title()}**: {subv}")
+                    else:
+                        lines.append(f"{v}")
+                advisory_text = "\n".join(lines)
+            elif isinstance(advisory_text, list):
+                advisory_text = "\n".join([f"- {str(item)}" for item in advisory_text])
+            elif not isinstance(advisory_text, str):
+                advisory_text = str(advisory_text)
             
             # Check for low confidence or non-plant image rejection
             if confidence < 50.0 or status.lower() == 'invalid' or 'invalid' in disease.lower() or 'clear' in advisory_text.lower() or 'پودے' in advisory_text:
