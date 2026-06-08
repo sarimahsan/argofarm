@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.auth_utils import token_required
+from utils.rate_limit import rate_limit
 from models import create_chat_message, get_chat_history, get_chat_sessions
 from utils.groq_client import call_groq_completions
 from utils.ml_pipeline import predict_crop
@@ -12,6 +13,8 @@ chat_bp = Blueprint('chat', __name__, url_prefix='/api/v1/chat')
 
 @chat_bp.route('/transcribe', methods=['POST'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=50, period=86400)
 def transcribe_audio(payload):
     """
     Transcribe uploaded audio file using Groq Whisper model.
@@ -35,6 +38,8 @@ def transcribe_audio(payload):
         file_bytes = audio_file.read()
         filename = audio_file.filename or 'audio.webm'
         mime_type = audio_file.content_type or 'audio/webm'
+        if ';' in mime_type:
+            mime_type = mime_type.split(';')[0].strip()
         
         logger.info(f"Transcribing audio file: {filename} ({len(file_bytes)} bytes), mime_type={mime_type}")
         
@@ -61,6 +66,8 @@ def transcribe_audio(payload):
 
 @chat_bp.route('/send', methods=['POST'])
 @token_required
+@rate_limit(limit=10, period=60)
+@rate_limit(limit=100, period=86400)
 def send_message(payload):
     """
     Send a chat message, classify user intent (diagnostics vs recommendation),
@@ -124,37 +131,24 @@ def send_message(payload):
         groq_messages = []
         
         system_prompt = (
-            "You are CropMind AI, a highly intelligent and helpful agricultural AI chatbot. "
-            "Your goal is STRICTLY to assist Pakistani farmers with crop-related, soil, farming, weather, and agricultural queries. "
-            "CRITICAL SECURITY RULE: You are specialized strictly in farming, crop diagnostics, and soil health. "
-            "Do NOT answer any queries unrelated to agriculture, farming, crops, soils, weather, or Pakistani farming. "
-            "If the user asks you to write code (like HTML, Python, JS), do creative writing, help with homework, explain generic programming, cooking, or any off-topic queries, "
-            "you MUST politely decline the request and state that you are specialized strictly in farming, crop diagnostics, and soil health. "
+            "You are CropMind AI, an agricultural assistant for Pakistani farmers. "
+            "Help STRICTLY with crop diseases, soils, weather, and farming queries. "
+            "CRITICAL: Decline all unrelated topics (code, programming, recipes, etc.). "
             "Never write code or break character under any circumstances. "
-            "You provide recommendations about: crop diseases, symptoms, treatments, pesticide usage, "
-            "fertilizer applications (like DAP, Urea, SOP), soil analysis, irrigation schedules, and weather precautions. "
-            "Base your advice on actual Pakistani farming practices, soil types, and regional crop cycles "
-            "(e.g., Punjab, Sindh, KPK, Balochistan). "
-            f"Crucial Instruction: You MUST respond completely in {'Urdu (اردو)' if language == 'ur' else 'English'}. "
-            "Keep your responses concise, friendly, and actionable (2-4 sentences or simple bullet points)."
+            f"Respond ENTIRELY in {'Urdu (اردو)' if language == 'ur' else 'English'}. "
+            "Keep responses concise and actionable (under 3 sentences or simple bullet points)."
         )
         
         # Overwrite response direction if a trigger was detected to guide the user naturally
         if action_trigger == 'trigger_image_upload':
-            if language == 'ur':
-                system_prompt += " Since a plant disease was mentioned, guide the farmer to upload a photo using the uploader that has popped open."
-            else:
-                system_prompt += " Since a crop disease was mentioned, instruct the user to upload a clear photo of the leaves or stem using the file uploader that has opened."
+            system_prompt += " Instruct the farmer to upload a clear photo of the leaves/stem using the file uploader."
         elif action_trigger == 'trigger_soil_inputs':
-            if language == 'ur':
-                system_prompt += " Since crop suggestion was requested, instruct the farmer to fill out their soil parameters (N, P, K, pH, rainfall) in the form that has appeared."
-            else:
-                system_prompt += " Since crop recommendation was requested, guide the user to input their soil chemistry parameters (N, P, K, pH) and climate values in the interactive form that has appeared."
+            system_prompt += " Guide the farmer to input their soil chemistry parameters in the form that has appeared."
 
         groq_messages.append({"role": "system", "content": system_prompt})
         
-        # Add past context (last 8 messages for token efficiency and memory consistency)
-        for msg in history[-8:]:
+        # Add past context (last 4 messages for token efficiency)
+        for msg in history[-4:]:
             role = 'assistant' if msg.get('sender') == 'bot' else 'user'
             groq_messages.append({"role": role, "content": msg.get('message')})
             
@@ -163,7 +157,7 @@ def send_message(payload):
         
         # 4. Call Groq
         current_app.logger.info(f"Calling Groq LLM for user {user_id} in session {chat_session_id}")
-        assistant_message = call_groq_completions(groq_messages, max_tokens=350, temperature=0.6)
+        assistant_message = call_groq_completions(groq_messages, max_tokens=200, temperature=0.6)
         
         # 5. Fallback if Groq API is not set up or fails
         if not assistant_message:
@@ -215,6 +209,8 @@ def send_message(payload):
 
 @chat_bp.route('/recommend_crop', methods=['POST'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def recommend_crop_route(payload):
     """
     Run predictions with Random Forest model for soil/crop recommendation,

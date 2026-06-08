@@ -3,6 +3,7 @@ import logging
 import requests
 from flask import Blueprint, request, jsonify
 from utils.auth_utils import token_required
+from utils.rate_limit import rate_limit
 from utils.gemini_client import call_gemini
 from models import get_user_by_id
 
@@ -139,28 +140,27 @@ def generate_gemini_advisory(weather_data, region, lang='en'):
         )
 
     system_instruction = (
-        "You are 'AgroWeather AI', an elite agricultural meteorologist and crop protection specialist in Pakistan. "
-        "Analyze the provided weather data and generate a highly concise crop advisory for the farmer.\n\n"
-        "IMPORTANT: Your response MUST be extremely short — exactly 1 to 2 sentences max (no bullet points, no markdown headers). "
-        f"Respond ENTIRELY in {'Urdu (اردو)' if lang == 'ur' else 'English'}."
+        "You are 'AgroWeather AI', an agricultural meteorologist in Pakistan. "
+        "Analyze the weather data and output a crop advisory.\n"
+        "CRITICAL: Output exactly 1 sentence max. No formatting or headers. "
+        f"Respond ONLY in {'Urdu (اردو)' if lang == 'ur' else 'English'}."
     )
 
     prompt = (
-        f"Real-time weather for {region}, Pakistan:\n"
-        f"- Current Temperature: {temp}°C\n"
-        f"- Humidity: {humidity}%\n"
-        f"- Wind Speed: {wind} km/h\n"
-        f"- Condition: {WMO_CODES.get(wmo_code, ('Unknown',))[0]}\n\n"
-        f"7-Day Forecast:\n{forecast_summary}\n"
-        f"Generate a targeted crop protection advisory for farmers in {region}."
+        f"Weather in {region}:\n"
+        f"Current: {temp}°C, {humidity}% humidity, {wind}km/h wind, {WMO_CODES.get(wmo_code, ('Unknown',))[0]}.\n"
+        f"Forecast:\n{forecast_summary}\n"
+        "Generate 1 sentence crop advisory."
     )
 
-    advisory = call_gemini(prompt, system_instruction=system_instruction, temperature=0.6, max_tokens=200)
+    advisory = call_gemini(prompt, system_instruction=system_instruction, temperature=0.5, max_tokens=100)
     return advisory
 
 
 @weather_bp.route('/advisory', methods=['GET'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def get_weather_advisory(payload):
     """
     Get real-time weather data from Open-Meteo and AI-generated crop advisory from Gemini 2.5 Flash.

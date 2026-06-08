@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArgoFarm — Project Technical Report</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --primary: #16a34a;
+    --primary-dark: #15803d;
+    --accent: #f59e0b;
+    --bg: #ffffff;
+    --text: #1e293b;
+    --text-light: #64748b;
+    --border: #e2e8f0;
+    --code-bg: #f1f5f9;
+    --table-header: #f0fdf4;
+    --section-bg: #fafafa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.7;
+    font-size: 11pt;
+  }
+
+  /* Print styles */
+  @media print {
+    body { font-size: 10pt; line-height: 1.6; }
+    .page-break { page-break-before: always; }
+    .no-print { display: none !important; }
+    .cover { min-height: 100vh; }
+    table { font-size: 9pt; }
+    h1 { font-size: 18pt; }
+    h2 { font-size: 14pt; }
+    h3 { font-size: 12pt; }
+  }
+
+  /* Cover Page */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 40px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0f9ff 100%);
+    border-bottom: 4px solid var(--primary);
+  }
+  .cover-icon { font-size: 72px; margin-bottom: 20px; }
+  .cover h1 {
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--primary-dark);
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+  }
+  .cover .subtitle {
+    font-size: 18px;
+    color: var(--text-light);
+    max-width: 600px;
+    margin: 0 auto 40px;
+    font-weight: 400;
+  }
+  .cover-meta {
+    margin-top: 40px;
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 2;
+  }
+  .cover-meta strong { color: var(--text); }
+
+  /* Content */
+  .content { max-width: 900px; margin: 0 auto; padding: 40px 40px 80px; }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--primary-dark);
+    margin: 50px 0 10px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--primary);
+  }
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 35px 0 12px;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin: 24px 0 8px;
+  }
+
+  p { margin-bottom: 12px; }
+  ul, ol { margin: 8px 0 16px 24px; }
+  li { margin-bottom: 6px; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 10.5pt;
+  }
+  th, td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--table-header);
+    font-weight: 600;
+    color: var(--primary-dark);
+    white-space: nowrap;
+  }
+  tr:nth-child(even) { background: #fafafa; }
+
+  /* Code */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9.5pt;
+    color: #b91c1c;
+  }
+  pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5pt;
+    line-height: 1.6;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+
+  /* Info boxes */
+  .info-box {
+    background: #f0fdf4;
+    border-left: 4px solid var(--primary);
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .warning-box {
+    background: #fffbeb;
+    border-left: 4px solid var(--accent);
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+  }
+
+  /* Architecture diagram placeholder */
+  .arch-diagram {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 30px;
+    margin: 20px 0;
+    text-align: center;
+  }
+  .arch-diagram .layer {
+    display: inline-block;
+    padding: 10px 20px;
+    margin: 6px 8px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 11pt;
+  }
+  .arch-diagram .layer-frontend { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+  .arch-diagram .layer-backend { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .arch-diagram .layer-ai { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+  .arch-diagram .layer-db { background: #fce7f3; color: #9d174d; border: 1px solid #f9a8d4; }
+  .arch-diagram .layer-infra { background: #e0e7ff; color: #3730a3; border: 1px solid #a5b4fc; }
+  .arch-diagram .arrow { color: var(--text-light); font-size: 20px; margin: 0 4px; vertical-align: middle; }
+
+  .toc { margin: 30px 0; }
+  .toc a { color: var(--text); text-decoration: none; }
+  .toc a:hover { color: var(--primary); }
+  .toc ol { line-height: 2.2; }
+  .toc li { font-weight: 500; }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 9pt;
+    font-weight: 600;
+  }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+
+  footer {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-light);
+    font-size: 10pt;
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="cover">
+  <div class="cover-icon">🌾</div>
+  <h1>ArgoFarm</h1>
+  <p class="subtitle">
+    AI-Powered Crop Diagnostics &amp; Advisory Platform for Pakistan<br>
+    <em>Technical Project Report</em>
+  </p>
+  <div class="cover-meta">
+    <strong>Platform:</strong> Web Application (SPA)<br>
+    <strong>Domain:</strong> Agricultural Technology (AgriTech) / Artificial Intelligence<br>
+    <strong>Target Region:</strong> Pakistan 🇵🇰<br>
+    <strong>Languages Supported:</strong> English &amp; Urdu (اردو)<br>
+    <strong>Report Date:</strong> June 2026<br>
+  </div>
+</div>
+
+<!-- ==================== CONTENT ==================== -->
+<div class="content">
+
+<!-- TABLE OF CONTENTS -->
+<h1>Table of Contents</h1>
+<div class="toc">
+<ol>
+  <li><a href="#overview">Project Overview</a></li>
+  <li><a href="#techstack">Technology Stack</a></li>
+  <li><a href="#architecture">System Architecture</a></li>
+  <li><a href="#features">Features &amp; Modules</a></li>
+  <li><a href="#ai-models">AI &amp; Machine Learning Models</a></li>
+  <li><a href="#rate-limiting">API Rate Limiting &amp; Security</a></li>
+  <li><a href="#database">Database Design</a></li>
+  <li><a href="#api-endpoints">REST API Endpoints</a></li>
+  <li><a href="#project-structure">Project Directory Structure</a></li>
+  <li><a href="#deployment">Deployment Architecture</a></li>
+  <li><a href="#security">Security Measures</a></li>
+</ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== 1. PROJECT OVERVIEW ==================== -->
+<h1 id="overview">1. Project Overview</h1>
+
+<p>
+  <strong>ArgoFarm</strong> is an AI-powered agricultural advisory and crop disease diagnostics platform 
+  designed specifically for farmers in Pakistan. The platform integrates multiple artificial intelligence 
+  models — including Google Gemini 2.5 Flash Vision for image-based disease detection, Groq LLaMA 3.3 
+  for conversational advisory, and a custom-trained Random Forest model for soil-based crop 
+  recommendations — to provide a comprehensive decision-support system.
+</p>
+
+<p>
+  The application is a full-stack web platform with a Flask-based RESTful backend, a Vanilla JavaScript 
+  single-page application (SPA) frontend built with Vite, and a MySQL/SQLite database layer. It supports 
+  bilingual (English/Urdu) interaction across all modules and is designed to be mobile-responsive for 
+  field usage by farmers.
+</p>
+
+<h2>Problem Statement</h2>
+<p>
+  Pakistani farmers face significant crop losses due to late or incorrect disease identification, 
+  lack of access to expert agronomists, unreliable weather-based decision making, and absence of 
+  transparent wholesale market pricing. ArgoFarm addresses these challenges by providing instant 
+  AI-powered diagnostics, real-time weather advisories, community-driven knowledge sharing, and 
+  AI-assisted wholesale market analysis — all accessible through a single web interface.
+</p>
+
+<h2>Key Objectives</h2>
+<ul>
+  <li>Provide instant, AI-powered crop disease detection from leaf images with actionable treatment advisories</li>
+  <li>Enable voice-enabled conversational farming advisory in English and Urdu</li>
+  <li>Deliver real-time weather forecasts with AI-generated crop protection guidance</li>
+  <li>Facilitate a community forum where farmers share knowledge and get AI-powered diagnosis on their posts</li>
+  <li>Support wholesale marketplace price analysis and negotiation tactics using AI</li>
+  <li>Provide soil-parameter-based crop recommendations using trained ML models</li>
+</ul>
+
+<div class="page-break"></div>
+
+<!-- ==================== 2. TECHNOLOGY STACK ==================== -->
+<h1 id="techstack">2. Technology Stack</h1>
+
+<h2>2.1 Backend Technologies</h2>
+<table>
+  <tr><th>Component</th><th>Technology</th><th>Version</th><th>Purpose</th></tr>
+  <tr><td>Web Framework</td><td>Flask</td><td>3.0.0</td><td>RESTful API server with blueprint-based routing</td></tr>
+  <tr><td>CORS Handler</td><td>Flask-CORS</td><td>4.0.0</td><td>Cross-origin resource sharing for SPA frontend</td></tr>
+  <tr><td>Database (Primary)</td><td>MySQL</td><td>8.0+</td><td>Production relational database with connection pooling</td></tr>
+  <tr><td>Database (Fallback)</td><td>SQLite</td><td>3.x</td><td>Zero-config local development database</td></tr>
+  <tr><td>MySQL Connector</td><td>mysql-connector-python</td><td>8.2.0</td><td>Python MySQL driver with connection pool</td></tr>
+  <tr><td>Authentication</td><td>PyJWT + bcrypt</td><td>2.12.1 / 4.1.1</td><td>JWT token generation and password hashing</td></tr>
+  <tr><td>ML Framework</td><td>scikit-learn</td><td>1.6.1</td><td>Random Forest crop recommendation model</td></tr>
+  <tr><td>Data Processing</td><td>pandas</td><td>2.0+</td><td>Tabular data handling for ML pipeline</td></tr>
+  <tr><td>Model Serialization</td><td>joblib</td><td>1.3+</td><td>Model persistence (.pkl file loading)</td></tr>
+  <tr><td>Image Processing</td><td>Pillow</td><td>9.0+</td><td>Image validation and pre-processing</td></tr>
+  <tr><td>HTTP Client</td><td>requests</td><td>2.31.0</td><td>External API calls (Gemini, Groq, Open-Meteo)</td></tr>
+  <tr><td>Environment Config</td><td>python-dotenv</td><td>1.0.0</td><td>Environment variable management from .env files</td></tr>
+  <tr><td>Language</td><td>Python</td><td>3.9+</td><td>Primary backend programming language</td></tr>
+</table>
+
+<h2>2.2 Frontend Technologies</h2>
+<table>
+  <tr><th>Component</th><th>Technology</th><th>Purpose</th></tr>
+  <tr><td>Core Language</td><td>Vanilla JavaScript (ES Modules)</td><td>Application logic, DOM manipulation, routing</td></tr>
+  <tr><td>Build Tool</td><td>Vite 8.0</td><td>Lightning-fast dev server and production bundler</td></tr>
+  <tr><td>Styling</td><td>Vanilla CSS (Custom Properties)</td><td>Full dark/light theme system with CSS variables</td></tr>
+  <tr><td>Maps</td><td>Leaflet.js</td><td>Interactive disease outbreak radar GIS mapping</td></tr>
+  <tr><td>Charts</td><td>Chart.js</td><td>Dashboard analytics: doughnut, bar, and line charts</td></tr>
+  <tr><td>Icons</td><td>Font Awesome 6</td><td>UI iconography throughout the application</td></tr>
+  <tr><td>Fonts</td><td>Google Fonts (Inter)</td><td>Modern, clean typography</td></tr>
+  <tr><td>Routing</td><td>Hash-based SPA Router (custom)</td><td>Client-side page navigation without full reloads</td></tr>
+  <tr><td>State Management</td><td>Custom global state (state.js)</td><td>Centralized auth, preferences, and session state</td></tr>
+  <tr><td>API Layer</td><td>Custom HTTP client (api.js)</td><td>Centralized fetch wrapper with caching, auth headers</td></tr>
+</table>
+
+<h2>2.3 AI &amp; External APIs</h2>
+<table>
+  <tr><th>Service</th><th>Model / API</th><th>Usage</th></tr>
+  <tr><td>Google Gemini</td><td>Gemini 2.5 Flash / 3.5 Flash</td><td>Crop disease vision diagnosis, weather advisory, price prediction, outbreak forecasting</td></tr>
+  <tr><td>Groq Cloud</td><td>LLaMA 3.3 70B Versatile</td><td>Chat completions, crop planning, deal analysis, AI calendar, post diagnostics</td></tr>
+  <tr><td>Groq Cloud</td><td>Whisper Large V3 Turbo</td><td>Voice-to-text audio transcription for voice chat</td></tr>
+  <tr><td>Open-Meteo</td><td>Open-Meteo Forecast API</td><td>7-day weather forecasts (free, no API key required)</td></tr>
+</table>
+
+<h2>2.4 DevOps &amp; Infrastructure</h2>
+<table>
+  <tr><th>Component</th><th>Technology</th><th>Purpose</th></tr>
+  <tr><td>Containerization</td><td>Docker + Docker Compose</td><td>Multi-service orchestration (MySQL, Flask, Nginx, Frontend)</td></tr>
+  <tr><td>Reverse Proxy</td><td>Nginx (Alpine)</td><td>Load balancing, SSL termination, static file serving</td></tr>
+  <tr><td>Frontend Hosting</td><td>Netlify</td><td>CDN-based static frontend deployment with API proxy rules</td></tr>
+  <tr><td>Backend Hosting</td><td>VPS / Docker</td><td>Flask application server on port 5000 (dev) / 3000 (prod)</td></tr>
+  <tr><td>Version Control</td><td>Git</td><td>Source code management</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 3. SYSTEM ARCHITECTURE ==================== -->
+<h1 id="architecture">3. System Architecture</h1>
+
+<p>ArgoFarm follows a <strong>three-tier client-server architecture</strong> with an AI/ML service layer:</p>
+
+<div class="arch-diagram">
+  <div style="margin-bottom: 16px;">
+    <span class="layer layer-frontend">Browser (Vanilla JS SPA)</span>
+  </div>
+  <div style="margin-bottom: 4px; color: #94a3b8;">▼ HTTPS / REST API ▼</div>
+  <div style="margin-bottom: 16px;">
+    <span class="layer layer-infra">Nginx Reverse Proxy</span>
+  </div>
+  <div style="margin-bottom: 4px; color: #94a3b8;">▼</div>
+  <div style="margin-bottom: 16px;">
+    <span class="layer layer-backend">Flask REST API (Python)</span>
+  </div>
+  <div style="margin-bottom: 4px; color: #94a3b8;">▼ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▼ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ▼</div>
+  <div>
+    <span class="layer layer-db">MySQL / SQLite</span>
+    <span class="layer layer-ai">Gemini &amp; Groq APIs</span>
+    <span class="layer layer-ai">scikit-learn ML</span>
+  </div>
+</div>
+
+<h2>3.1 Data Flow</h2>
+<ol>
+  <li><strong>Client Layer:</strong> The browser-based SPA sends HTTP requests to the Flask backend. All protected routes require a JWT Bearer token in the <code>Authorization</code> header.</li>
+  <li><strong>API Gateway:</strong> Nginx acts as a reverse proxy, forwarding <code>/api/*</code> requests to Flask and serving static frontend assets.</li>
+  <li><strong>Application Layer:</strong> Flask processes business logic using modular blueprints (auth, scan, chat, dashboard, etc.). Each blueprint handles route validation, authentication, and orchestration of AI/ML services.</li>
+  <li><strong>AI/ML Layer:</strong> Depending on the feature, Flask dispatches requests to Google Gemini (vision/text), Groq (chat/transcription), or the local scikit-learn pipeline. Each AI call has an offline fallback if the external API is unavailable.</li>
+  <li><strong>Data Layer:</strong> MySQL (production) or SQLite (development) stores user profiles, scan results, chat history, community posts, and marketplace listings.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ==================== 4. FEATURES ==================== -->
+<h1 id="features">4. Features &amp; Modules</h1>
+
+<h2>4.1 Authentication &amp; User Management</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Registration</td><td>Name, email, password with bcrypt hashing (salt rounds). Region and crop type selection.</td></tr>
+  <tr><td>Login</td><td>Email + password authentication. Returns JWT token valid for 30 days.</td></tr>
+  <tr><td>Password Reset</td><td>Email-based password reset flow via Gmail SMTP with app-specific passwords.</td></tr>
+  <tr><td>Profile Management</td><td>Update name, region, preferred crops. Dark/light theme and English/Urdu language toggle.</td></tr>
+  <tr><td>Session Security</td><td>JWT tokens with expiry, automatic logout on 401 responses, localStorage-based persistence.</td></tr>
+</table>
+
+<h2>4.2 AI Crop Disease Scanning</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Image Upload</td><td>User uploads a photo of a crop leaf from camera or gallery.</td></tr>
+  <tr><td>AI Vision Analysis</td><td>Image is base64-encoded and sent to <strong>Gemini 2.5 Flash Vision</strong> with a structured pathologist prompt.</td></tr>
+  <tr><td>Disease Identification</td><td>Returns crop species, disease name (with Urdu transliteration), confidence score (0-100%), and health status.</td></tr>
+  <tr><td>Treatment Advisory</td><td>Structured markdown advisory with Symptoms, Organic Remedies, Chemical Remedies, and Prevention sections.</td></tr>
+  <tr><td>Invalid Image Rejection</td><td>Blurry, non-plant, or unclear images are detected (confidence &lt; 50%) and rejected with a localized message.</td></tr>
+  <tr><td>Offline Fallback</td><td>If Gemini API fails, a rule-based agronomist fallback provides diagnosis based on the crop type selected.</td></tr>
+  <tr><td>Scan Persistence</td><td>All valid scans are stored in the database with image URL, region, advisory text, and severity classification.</td></tr>
+</table>
+
+<h2>4.3 CropMind AI Chat</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Conversational AI</td><td>Multi-turn chat with <strong>Groq LLaMA 3.3 70B</strong> acting as "CropMind AI", a Pakistani agricultural advisor.</td></tr>
+  <tr><td>Intent Classification</td><td>Incoming messages are classified into diagnostics (triggers scan flow) vs. general advisory.</td></tr>
+  <tr><td>Context Window</td><td>Last 4 messages from chat history are sent as context to maintain conversation continuity.</td></tr>
+  <tr><td>Voice Input</td><td>Users can speak their queries. Audio is recorded via MediaRecorder API and transcribed by <strong>Groq Whisper Large V3 Turbo</strong>.</td></tr>
+  <tr><td>Session Management</td><td>Multiple independent chat sessions with persistent history stored in the database.</td></tr>
+  <tr><td>Bilingual Support</td><td>Responds in English or Urdu based on user language preference.</td></tr>
+</table>
+
+<h2>4.4 ML Crop Recommendation</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Input Parameters</td><td>Nitrogen (N), Phosphorus (P), Potassium (K), Temperature, Humidity, pH, Rainfall.</td></tr>
+  <tr><td>ML Model</td><td><strong>Random Forest Classifier</strong> trained on agricultural soil datasets (scikit-learn, serialized as .pkl).</td></tr>
+  <tr><td>Output</td><td>Predicted optimal crop (e.g., Wheat, Rice, Cotton, Sugarcane, etc.).</td></tr>
+  <tr><td>AI Enhancement</td><td>Groq LLaMA generates a yield optimization report with fertilizer scheduling, irrigation tips, and expected yields.</td></tr>
+</table>
+
+<h2>4.5 Weather Advisory</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Weather Data</td><td>Real-time 7-day forecast from <strong>Open-Meteo API</strong> (free, no API key). Includes temperature, humidity, wind, precipitation probability, and WMO weather codes.</td></tr>
+  <tr><td>AI Advisory</td><td><strong>Gemini 2.5 Flash</strong> generates a one-sentence crop protection advisory based on current and forecasted weather conditions.</td></tr>
+  <tr><td>Regional Support</td><td>Supports 16 Pakistani cities with GPS coordinate lookup. Province-level fallback mapping.</td></tr>
+  <tr><td>Visual Display</td><td>7-day forecast cards with icons, temperature ranges, rain probability, and color-coded conditions.</td></tr>
+</table>
+
+<h2>4.6 Dashboard &amp; Analytics</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Scan Statistics</td><td>Total scans, healthy vs. diseased ratio, average confidence, disease distribution pie chart.</td></tr>
+  <tr><td>Disease Outbreak Radar</td><td>Interactive <strong>Leaflet.js</strong> map of Pakistan showing geolocated disease scan markers with popup details.</td></tr>
+  <tr><td>AI Outbreak Forecasting</td><td><strong>Gemini 2.5 Flash</strong> predicts future disease spread hotspots based on historical scan data. Renders as heatmap circles on the radar.</td></tr>
+  <tr><td>Analytics Charts</td><td><strong>Chart.js</strong> doughnut, bar, and trend charts for disease distribution, crop health rates, and scan activity.</td></tr>
+</table>
+
+<h2>4.7 Community Forum &amp; Marketplace</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Discussion Posts</td><td>Farmers create posts categorized by topic (Disease Help, General, Weather, Market, etc.).</td></tr>
+  <tr><td>Likes &amp; Comments</td><td>Per-user like/unlike toggle (tracked in <code>post_likes</code> table). Threaded comment system.</td></tr>
+  <tr><td>AI Post Diagnosis</td><td>"Ask Dr. Crop AI" button triggers <strong>Groq LLaMA</strong> to diagnose the issue described in a post and post a reply comment.</td></tr>
+  <tr><td>Crop Calendar</td><td>Interactive month-by-month planting guides with <strong>Groq LLaMA</strong>-generated agronomist advice.</td></tr>
+  <tr><td>Wholesale Marketplace</td><td>Farmers list crops for wholesale sale. Buyers can view listings, analyze deals with AI, and get price suggestions.</td></tr>
+</table>
+
+<h2>4.8 AI Wholesale Deal Analysis</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Deal Analysis</td><td><strong>Groq LLaMA</strong> evaluates a marketplace listing's price, generates a deal rating, profit potential estimate, and 3 WhatsApp negotiation tactics.</td></tr>
+  <tr><td>Price Suggestion</td><td><strong>Gemini 2.5 Flash</strong> suggests optimal wholesale pricing with price ranges, confidence, reasoning, and market insights.</td></tr>
+  <tr><td>Offline Fallback</td><td>Hardcoded Pakistani mandi price tables (PKR/maund) for wheat, rice, cotton, maize, sugarcane, potato, tomato, onion.</td></tr>
+</table>
+
+<h2>4.9 AI Crop Planner</h2>
+<table>
+  <tr><th>Feature</th><th>Details</th></tr>
+  <tr><td>Inputs</td><td>Crop type, land size (acres), budget (PKR), and water availability (Low/Medium/High).</td></tr>
+  <tr><td>AI Generation</td><td><strong>Groq LLaMA</strong> generates a structured 4-month crop plan: Month 1 (Soil Prep), Month 2 (Sowing), Month 3 (Fertilizers/Pests), Month 4 (Harvest).</td></tr>
+  <tr><td>Localization</td><td>Plans are generated directly in English or Urdu script based on user preference.</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 5. AI & ML MODELS ==================== -->
+<h1 id="ai-models">5. AI &amp; Machine Learning Models</h1>
+
+<h2>5.1 Google Gemini 2.5 Flash / 3.5 Flash</h2>
+<table>
+  <tr><th>Attribute</th><th>Details</th></tr>
+  <tr><td>Provider</td><td>Google DeepMind (via REST API)</td></tr>
+  <tr><td>Models Used</td><td><code>gemini-2.5-flash</code> (primary), <code>gemini-3.5-flash</code> (fallback)</td></tr>
+  <tr><td>Capabilities</td><td>Multimodal (text + vision), JSON structured output, system instructions</td></tr>
+  <tr><td>Usage in ArgoFarm</td><td>
+    <ul>
+      <li><strong>Disease Scanning:</strong> Vision API analyzes leaf images and returns JSON diagnosis</li>
+      <li><strong>Weather Advisory:</strong> Generates crop protection advice from Open-Meteo forecast data</li>
+      <li><strong>Price Prediction:</strong> Suggests wholesale pricing with market analysis</li>
+      <li><strong>Outbreak Forecasting:</strong> Predicts disease spread hotspots from historical scan data</li>
+    </ul>
+  </td></tr>
+  <tr><td>Free Tier Limits</td><td>5 requests/minute, 20 requests/day</td></tr>
+  <tr><td>Fallback Strategy</td><td>Primary model → fallback model → offline Python-based agronomist response</td></tr>
+</table>
+
+<h2>5.2 Groq LLaMA 3.3 70B Versatile</h2>
+<table>
+  <tr><th>Attribute</th><th>Details</th></tr>
+  <tr><td>Provider</td><td>Groq Cloud (OpenAI-compatible API)</td></tr>
+  <tr><td>Model</td><td><code>llama-3.3-70b-versatile</code></td></tr>
+  <tr><td>Type</td><td>Large Language Model (LLM) — text-only chat completions</td></tr>
+  <tr><td>Usage in ArgoFarm</td><td>
+    <ul>
+      <li><strong>CropMind Chat:</strong> Multi-turn conversational farming advisor</li>
+      <li><strong>Crop Recommendation Reports:</strong> Yield optimization advisory from ML predictions</li>
+      <li><strong>Crop Planner:</strong> 4-month structured farming timeline</li>
+      <li><strong>Deal Analysis:</strong> Wholesale marketplace evaluation and negotiation tactics</li>
+      <li><strong>Post Diagnosis:</strong> "Dr. Crop AI" community forum auto-diagnosis</li>
+      <li><strong>Calendar Advisory:</strong> Monthly crop cultivation guidelines</li>
+    </ul>
+  </td></tr>
+  <tr><td>Free Tier Limits</td><td>15 requests/minute, ~1,500 requests/day</td></tr>
+</table>
+
+<h2>5.3 Groq Whisper Large V3 Turbo</h2>
+<table>
+  <tr><th>Attribute</th><th>Details</th></tr>
+  <tr><td>Provider</td><td>Groq Cloud (OpenAI-compatible Transcription API)</td></tr>
+  <tr><td>Model</td><td><code>whisper-large-v3-turbo</code></td></tr>
+  <tr><td>Type</td><td>Automatic Speech Recognition (ASR)</td></tr>
+  <tr><td>Usage</td><td>Transcribes farmer voice recordings (WebM/OGG/WAV) to text for the CropMind chat</td></tr>
+  <tr><td>Supported Formats</td><td>audio/webm, audio/ogg, audio/wav, audio/mp3, audio/m4a</td></tr>
+</table>
+
+<h2>5.4 Random Forest Crop Recommender (Local ML)</h2>
+<table>
+  <tr><th>Attribute</th><th>Details</th></tr>
+  <tr><td>Algorithm</td><td>Random Forest Classifier (scikit-learn)</td></tr>
+  <tr><td>Model File</td><td><code>ai_models/crop_recommender_model.pkl</code> (5.37 MB)</td></tr>
+  <tr><td>Training</td><td>Trained via Jupyter Notebook (<code>Notebooks/Crop_Recomendation_RF.ipynb</code>) on agricultural soil datasets</td></tr>
+  <tr><td>Input Features</td><td>Nitrogen (N), Phosphorus (P), Potassium (K), Temperature, Humidity, pH, Rainfall</td></tr>
+  <tr><td>Output</td><td>Predicted crop label (e.g., "wheat", "rice", "cotton", "sugarcane", etc.)</td></tr>
+  <tr><td>Loading Strategy</td><td>Model is loaded once at server startup using <code>joblib.load()</code> and cached in memory</td></tr>
+  <tr><td>Fallback</td><td>If model file is missing, defaults to "wheat" as a safe crop for Pakistan</td></tr>
+</table>
+
+<div class="info-box">
+  <strong>Note:</strong> An additional Jupyter Notebook (<code>Notebooks/ElasticNet_Traning_FInetune.ipynb</code>) 
+  is included in the repository for ElasticNet model experimentation, though it is not actively deployed in the application.
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== 6. RATE LIMITING ==================== -->
+<h1 id="rate-limiting">6. API Rate Limiting &amp; Security</h1>
+
+<p>
+  To prevent API key misuse and respect free-tier quotas of external AI providers, ArgoFarm implements 
+  a centralized, decorator-based rate limiting system applied to all AI-powered endpoints.
+</p>
+
+<h2>6.1 Rate Limiting Architecture</h2>
+<table>
+  <tr><th>Attribute</th><th>Details</th></tr>
+  <tr><td>Implementation</td><td>Python decorator (<code>@rate_limit</code>) in <code>backend/utils/rate_limit.py</code></td></tr>
+  <tr><td>Storage</td><td>In-memory dictionary keyed by <code>(identifier, endpoint, period)</code></td></tr>
+  <tr><td>User Identification</td><td>Primary: JWT <code>user_id</code> from token payload. Fallback: Client IP address (supports <code>X-Forwarded-For</code> for reverse proxies)</td></tr>
+  <tr><td>HTTP Response on Block</td><td><code>429 Too Many Requests</code> with JSON: <code>{"status": "error", "message": "Rate limit exceeded (N req / Xm). Please wait Y seconds."}</code></td></tr>
+  <tr><td>Decorator Stacking</td><td>Multiple <code>@rate_limit</code> decorators can be stacked (e.g., per-minute AND per-day limits on the same endpoint)</td></tr>
+</table>
+
+<h2>6.2 Rate Limits by Endpoint</h2>
+<table>
+  <tr><th>Endpoint</th><th>AI Model Used</th><th>Per Minute</th><th>Per Day</th></tr>
+  <tr><td><code>POST /api/v1/scan/predict</code></td><td>Gemini 2.5 Flash Vision</td><td>3</td><td>10</td></tr>
+  <tr><td><code>POST /api/v1/chat/send</code></td><td>Groq LLaMA 3.3</td><td>10</td><td>100</td></tr>
+  <tr><td><code>POST /api/v1/chat/transcribe</code></td><td>Groq Whisper</td><td>5</td><td>50</td></tr>
+  <tr><td><code>POST /api/v1/chat/recommend_crop</code></td><td>Groq LLaMA 3.3</td><td>5</td><td>30</td></tr>
+  <tr><td><code>GET /api/v1/weather/advisory</code></td><td>Gemini 2.5 Flash</td><td>5</td><td>30</td></tr>
+  <tr><td><code>POST /api/v1/wholesale/analyze</code></td><td>Groq LLaMA 3.3</td><td>5</td><td>30</td></tr>
+  <tr><td><code>POST /api/v1/wholesale/suggest-price</code></td><td>Gemini 2.5 Flash</td><td>5</td><td>30</td></tr>
+  <tr><td><code>GET /api/v1/dashboard/forecast</code></td><td>Gemini 2.5 Flash</td><td>5</td><td>30</td></tr>
+  <tr><td><code>POST /api/v1/planner/generate</code></td><td>Groq LLaMA 3.3</td><td>5</td><td>30</td></tr>
+  <tr><td><code>POST /api/v1/community/ai-calendar</code></td><td>Groq LLaMA 3.3</td><td>5</td><td>30</td></tr>
+  <tr><td><code>POST /api/v1/community/posts/{id}/ai-diagnose</code></td><td>Groq LLaMA 3.3</td><td>5</td><td>30</td></tr>
+</table>
+
+<h2>6.3 Rate Limit Decorator Usage Example</h2>
+<pre><code>from utils.rate_limit import rate_limit
+
+@scan_bp.route('/predict', methods=['POST'])
+@token_required          # 1. Authenticate user (extracts JWT payload)
+@rate_limit(limit=3, period=60)      # 2. Max 3 requests per minute
+@rate_limit(limit=10, period=86400)  # 3. Max 10 requests per day
+def predict(payload):
+    # ... endpoint logic
+</code></pre>
+
+<div class="page-break"></div>
+
+<!-- ==================== 7. DATABASE ==================== -->
+<h1 id="database">7. Database Design</h1>
+
+<h2>7.1 Database Engine</h2>
+<p>
+  ArgoFarm uses a <strong>dual-database strategy</strong>: MySQL 8.0 for production with a 10-connection 
+  pool, and SQLite for zero-configuration local development. The application auto-detects MySQL availability 
+  at startup and falls back transparently to SQLite. All SQL queries use parameterized statements and are 
+  automatically translated between MySQL (<code>%s</code>) and SQLite (<code>?</code>) placeholder formats.
+</p>
+
+<h2>7.2 Schema Tables</h2>
+<table>
+  <tr><th>Table</th><th>Key Columns</th><th>Description</th></tr>
+  <tr>
+    <td><code>users</code></td>
+    <td>id, name, email, password_hash, region, crop_types, created_at</td>
+    <td>Farmer profiles with bcrypt-hashed passwords, regional preferences, and crop selections.</td>
+  </tr>
+  <tr>
+    <td><code>scans</code></td>
+    <td>id, user_id, crop_type, disease, confidence, status, region, image_url, advisory_english, advisory_urdu, severity, created_at</td>
+    <td>Disease detection results from Gemini Vision. Links to uploaded images in <code>static/uploads/</code>.</td>
+  </tr>
+  <tr>
+    <td><code>chat_history</code></td>
+    <td>id, user_id, chat_session_id, title, message, sender, message_type, language, metadata, created_at</td>
+    <td>All chat messages (user and bot) organized by session. Stores text, image references, and scan result metadata.</td>
+  </tr>
+  <tr>
+    <td><code>community_posts</code></td>
+    <td>id, user_id, title, content, category, likes_count, comments_count, created_at</td>
+    <td>Forum discussion posts with category tagging and aggregate counters.</td>
+  </tr>
+  <tr>
+    <td><code>post_likes</code></td>
+    <td>id, post_id, user_id, created_at</td>
+    <td>Tracks which users have liked which posts (unique constraint on post_id + user_id).</td>
+  </tr>
+  <tr>
+    <td><code>comments</code></td>
+    <td>id, post_id, user_id, content, created_at</td>
+    <td>Threaded comments on community posts (including AI-generated Dr. Crop AI replies).</td>
+  </tr>
+  <tr>
+    <td><code>marketplace_items</code></td>
+    <td>id, user_id, title, category, price, location, description, phone, created_at</td>
+    <td>Wholesale crop listings posted by farmers for B2B transactions.</td>
+  </tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 8. API ENDPOINTS ==================== -->
+<h1 id="api-endpoints">8. REST API Endpoints</h1>
+
+<p>All endpoints are prefixed with <code>/api/v1</code>. Protected routes require <code>Authorization: Bearer &lt;JWT&gt;</code>.</p>
+
+<h2>8.1 Authentication</h2>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Description</th></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/auth/register</code></td><td>No</td><td>User registration</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/auth/login</code></td><td>No</td><td>Login → returns JWT</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/auth/logout</code></td><td>Yes</td><td>Logout</td></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/auth/profile</code></td><td>Yes</td><td>Get user profile</td></tr>
+  <tr><td><span class="badge badge-amber">PUT</span></td><td><code>/auth/profile</code></td><td>Yes</td><td>Update profile</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/auth/forgot-password</code></td><td>No</td><td>Request password reset email</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/auth/change-password</code></td><td>Yes</td><td>Change password</td></tr>
+</table>
+
+<h2>8.2 AI Scanning</h2>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Rate Limit</th><th>Description</th></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/scan/predict</code></td><td>Yes</td><td>3/min, 10/day</td><td>Upload leaf image → Gemini Vision disease diagnosis</td></tr>
+</table>
+
+<h2>8.3 AI Chat</h2>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Rate Limit</th><th>Description</th></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/chat/send</code></td><td>Yes</td><td>10/min, 100/day</td><td>Send message to CropMind AI</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/chat/transcribe</code></td><td>Yes</td><td>5/min, 50/day</td><td>Voice transcription (Groq Whisper)</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/chat/recommend_crop</code></td><td>Yes</td><td>5/min, 30/day</td><td>Soil-based crop recommendation (RF + LLaMA)</td></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/chat/sessions</code></td><td>Yes</td><td>—</td><td>List all chat sessions</td></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/chat/history/{id}</code></td><td>Yes</td><td>—</td><td>Get chat history for a session</td></tr>
+</table>
+
+<h2>8.4 Dashboard &amp; Weather</h2>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Rate Limit</th><th>Description</th></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/dashboard/analytics</code></td><td>Yes</td><td>—</td><td>User scan statistics &amp; analytics</td></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/dashboard/outbreaks</code></td><td>Yes</td><td>—</td><td>All scan data for outbreak radar map</td></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/dashboard/forecast</code></td><td>Yes</td><td>5/min, 30/day</td><td>AI-predicted disease spread hotspots</td></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/weather/advisory</code></td><td>Yes</td><td>5/min, 30/day</td><td>7-day forecast + AI crop advisory</td></tr>
+</table>
+
+<h2>8.5 Community, Planner &amp; Wholesale</h2>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Rate Limit</th><th>Description</th></tr>
+  <tr><td><span class="badge badge-blue">GET</span></td><td><code>/community/posts</code></td><td>Optional</td><td>—</td><td>List all forum posts</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/community/posts</code></td><td>Yes</td><td>—</td><td>Create a forum post</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/community/posts/{id}/like</code></td><td>Yes</td><td>—</td><td>Like/unlike a post</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/community/posts/{id}/ai-diagnose</code></td><td>Yes</td><td>5/min, 30/day</td><td>AI diagnosis on a post</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/community/ai-calendar</code></td><td>Yes</td><td>5/min, 30/day</td><td>AI agronomist monthly advice</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/planner/generate</code></td><td>Yes</td><td>5/min, 30/day</td><td>Generate 4-month AI crop plan</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/wholesale/analyze</code></td><td>Yes</td><td>5/min, 30/day</td><td>AI deal analysis for marketplace listing</td></tr>
+  <tr><td><span class="badge badge-green">POST</span></td><td><code>/wholesale/suggest-price</code></td><td>Yes</td><td>5/min, 30/day</td><td>AI price suggestion for crop listing</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 9. PROJECT STRUCTURE ==================== -->
+<h1 id="project-structure">9. Project Directory Structure</h1>
+<pre><code>ArgoFarm/
+├── backend/
+│   ├── app.py                          # Flask app factory + blueprint registration
+│   ├── init_db.py                      # Database initialization (MySQL/SQLite)
+│   ├── requirements.txt                # Python dependencies
+│   ├── Dockerfile                      # Container build config
+│   ├── .env                            # Environment variables (API keys, DB config)
+│   ├── config/                         # Configuration classes (dev/prod)
+│   ├── ai_models/
+│   │   └── crop_recommender_model.pkl  # Trained Random Forest model (5.37 MB)
+│   ├── models/
+│   │   ├── __init__.py                 # Model exports
+│   │   └── queries.py                  # All SQL query functions (CRUD operations)
+│   ├── routes/
+│   │   ├── auth.py                     # Authentication & password management
+│   │   ├── dashboard.py                # Analytics, outbreak radar, AI forecasting
+│   │   ├── scan.py                     # Gemini Vision disease scanning
+│   │   ├── chat.py                     # CropMind AI chat, voice, recommendations
+│   │   ├── history.py                  # Scan history & statistics
+│   │   ├── community.py               # Forum, comments, AI calendar, diagnostics
+│   │   ├── planner.py                  # AI crop planning
+│   │   ├── wholesale.py                # AI deal analysis & price suggestion
+│   │   └── weather.py                  # Open-Meteo + Gemini weather advisory
+│   ├── utils/
+│   │   ├── gemini_client.py            # Google Gemini API client (text + vision)
+│   │   ├── groq_client.py             # Groq LLaMA + Whisper API client
+│   │   ├── rate_limit.py               # Centralized rate limiting decorator
+│   │   ├── ml_pipeline.py             # scikit-learn model loading & predictions
+│   │   ├── ml_startup_check.py        # ML model verification at boot
+│   │   ├── database.py                # MySQL/SQLite connection manager
+│   │   ├── auth_utils.py              # JWT generation, verification, bcrypt
+│   │   ├── email_utils.py             # Password reset email via Gmail SMTP
+│   │   └── logging_config.py          # Structured logging configuration
+│   └── static/uploads/                # User-uploaded scan images
+│
+├── frontend/
+│   ├── index.html                      # HTML entry point
+│   ├── vite.config.js                  # Vite bundler configuration
+│   ├── package.json                    # Node.js dependencies (Vite 8.0)
+│   ├── public/
+│   │   └── _redirects                  # Netlify API proxy rules
+│   └── src/
+│       ├── main.js                     # App entry, layout, copilot drawer
+│       ├── api.js                      # Centralized API client with caching
+│       ├── router.js                   # Hash-based SPA page router
+│       ├── state.js                    # Global state (auth, preferences)
+│       ├── utils.js                    # Toast notifications, helpers
+│       ├── style.css                   # Full CSS design system (dark/light themes)
+│       ├── pages/
+│       │   ├── landing.js             # Login / Register page
+│       │   ├── dashboard.js           # Dashboard + radar + analytics
+│       │   ├── chat.js                # CropMind AI chat (text + voice)
+│       │   ├── calendar.js            # Crop calendar
+│       │   ├── history.js             # Scan history viewer
+│       │   ├── community.js           # Forum + marketplace
+│       │   ├── planner.js             # AI crop planner
+│       │   ├── wholesale.js           # Wholesale marketplace
+│       │   └── settings.js            # Profile & theme settings
+│       ├── components/
+│       │   ├── sidebar.js             # Navigation sidebar
+│       │   └── modal.js               # Reusable modal component
+│       └── assets/                    # Static assets (icons, images)
+│
+├── Notebooks/
+│   ├── Crop_Recomendation_RF.ipynb     # Random Forest model training
+│   └── ElasticNet_Traning_FInetune.ipynb  # ElasticNet experimentation
+│
+├── nginx/                              # Nginx reverse proxy configuration
+├── docker-compose.yml                  # Docker multi-service orchestration
+├── Makefile                            # Development command shortcuts
+└── README.md                           # Project documentation
+</code></pre>
+
+<div class="page-break"></div>
+
+<!-- ==================== 10. DEPLOYMENT ==================== -->
+<h1 id="deployment">10. Deployment Architecture</h1>
+
+<h2>10.1 Docker Compose Services</h2>
+<table>
+  <tr><th>Service</th><th>Image</th><th>Port</th><th>Purpose</th></tr>
+  <tr><td><code>db</code></td><td>mysql:8.0</td><td>3306</td><td>MySQL database with health checks and persistent volume</td></tr>
+  <tr><td><code>backend</code></td><td>Custom (Dockerfile)</td><td>5000</td><td>Flask API server with auto-restart</td></tr>
+  <tr><td><code>frontend</code></td><td>Custom (Dockerfile)</td><td>3000 → 80</td><td>Static frontend served via internal web server</td></tr>
+  <tr><td><code>nginx</code></td><td>nginx:alpine</td><td>80, 443</td><td>Reverse proxy, SSL termination, load balancing</td></tr>
+</table>
+
+<h2>10.2 Production Deployment Flow</h2>
+<ol>
+  <li><strong>Frontend Build:</strong> <code>npm run build</code> → outputs to <code>dist/</code> → deployed to Netlify CDN.</li>
+  <li><strong>API Proxy:</strong> Netlify <code>_redirects</code> file proxies <code>/api/*</code> to the VPS backend, avoiding mixed-content issues.</li>
+  <li><strong>Backend:</strong> Flask runs on the VPS behind Nginx. Docker Compose orchestrates MySQL + Flask + Nginx.</li>
+  <li><strong>Database:</strong> MySQL 8.0 with persistent Docker volume. Auto-initialization via <code>init_db.py</code>.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ==================== 11. SECURITY ==================== -->
+<h1 id="security">11. Security Measures</h1>
+
+<table>
+  <tr><th>Security Layer</th><th>Implementation</th></tr>
+  <tr><td>Password Storage</td><td>bcrypt hashing with automatic salt generation. Passwords are never stored in plaintext.</td></tr>
+  <tr><td>Authentication</td><td>JWT (JSON Web Tokens) with HS256 signing. Tokens include <code>user_id</code>, <code>exp</code>, and <code>iat</code> claims. 30-day expiry.</td></tr>
+  <tr><td>Authorization</td><td><code>@token_required</code> decorator validates JWT on all protected endpoints. Returns 401 on invalid/expired tokens.</td></tr>
+  <tr><td>Rate Limiting</td><td><code>@rate_limit</code> decorator prevents API abuse. Per-user (JWT) and per-IP tracking. Returns 429 with wait time.</td></tr>
+  <tr><td>CORS</td><td>Flask-CORS configured with allowed headers (<code>Content-Type</code>, <code>Authorization</code>) and methods.</td></tr>
+  <tr><td>SQL Injection Prevention</td><td>All database queries use parameterized statements (<code>%s</code> / <code>?</code> placeholders). No string concatenation in queries.</td></tr>
+  <tr><td>API Key Protection</td><td>All external API keys (Gemini, Groq, Gmail) stored in <code>.env</code> file, never committed to version control.</td></tr>
+  <tr><td>Input Validation</td><td>All endpoints validate required fields and return 400 Bad Request with descriptive messages on invalid input.</td></tr>
+  <tr><td>Image Validation</td><td>Uploaded images are validated for non-empty content before processing. Non-plant images are rejected by AI.</td></tr>
+  <tr><td>Session Security</td><td>Frontend auto-clears auth tokens and cached data on 401 responses or manual logout.</td></tr>
+</table>
+
+</div>
+
+<footer>
+  ArgoFarm — AI-Powered Crop Diagnostics &amp; Advisory Platform &nbsp;|&nbsp; Technical Project Report &nbsp;|&nbsp; June 2026
+</footer>
+
+</body>
+</html>

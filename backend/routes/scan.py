@@ -6,6 +6,7 @@ import logging
 from flask import Blueprint, request, jsonify, current_app
 
 from utils.auth_utils import token_required
+from utils.rate_limit import rate_limit
 from models.queries import create_scan, create_chat_message
 from utils.gemini_client import call_gemini_vision
 
@@ -15,6 +16,8 @@ scan_bp = Blueprint('scan', __name__, url_prefix='/api/v1/scan')
 
 @scan_bp.route('/predict', methods=['POST'])
 @token_required
+@rate_limit(limit=3, period=60)
+@rate_limit(limit=10, period=86400)
 def predict(payload):
     """Handle image upload, run Gemini 2.5 Flash Vision model, save scan, and return B2B diagnosis result"""
     user_id = payload.get('user_id')
@@ -52,28 +55,62 @@ def predict(payload):
         base64_image = base64.b64encode(file_bytes).decode('utf-8')
 
         # System and user prompts for Gemini Vision
-        system_prompt = (
-            "You are 'Dr. Crop AI', the preeminent agricultural expert and chief crop pathologist in Pakistan, running a premium diagnostic service.\n"
-            "Analyze the crop leaf image and identify the exact disease. Return ONLY a valid JSON object.\n"
-            "DIAGNOSTIC GUIDELINES:\n"
-            "1. CROP IDENTIFICATION: If the crop type is provided as 'Unknown', perform a detailed botanical analysis of the leaf architecture (margins, shape, venation, color) to identify the crop species (e.g. 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.). Set this value in the 'crop_type' key.\n"
-            "2. DISEASE DIAGNOSIS: Do NOT default to 'Unknown' or 'Generic Leaf Spot' unless the image does not show a plant. Examine the leaf surface meticulously for early signs of fungal lesions, bacterial streaks, viral mosaic patterns, chlorosis, necrosis, rust pustules, or pest damage. Attempt a specific best-guess agronomist diagnosis (e.g., 'Potato Late Blight', 'Wheat Leaf Rust', 'Rice Blast', 'Tomato Early Blight', 'Cotton Leaf Curl Virus', etc.) and include the Urdu transliteration in parentheses.\n"
-            "3. ADVISORY CONTENT: Provide professional, high-yield agronomist recommendations. Under **Symptoms**, describe precise visual markers shown in the leaf. Under **Organic Remedies**, list actionable organic solutions used in Pakistan (e.g. neem oil spray, ash dusting, organic compost teas). Under **Chemical Remedies**, list specific active chemical compounds used in Pakistan (e.g. Mancozeb, Copper Oxychloride, Tebuconazole, Azoxystrobin) with recommended dosages. Under **Prevention**, list physical or cultural farm hygiene guidelines (e.g., proper spacing, clean tools, crop rotation).\n\n"
-            "The JSON object must have exactly these keys:\n"
-            "- \"crop_type\": The identified crop species (e.g. 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.)\n"
-            "- \"disease\": Specific disease name with Urdu transliteration in parentheses (e.g. 'Wheat Leaf Rust (پیلی کنگی)', 'Potato Late Blight (آلو کا پچھیتا جھلساؤ)', 'Cotton Leaf Curl Virus (کپاس کے پتوں کا مڑنا)', or 'Healthy (صحت مند)')\n"
-            "- \"confidence\": A numeric confidence value between 0 and 100 based on visible markers\n"
-            "- \"status\": 'Healthy' if the leaf has no pathology, otherwise 'Diseased'\n"
-            "- \"advisory_english\": A detailed, premium crop-saving advisory in English formatted in clean markdown. Provide exactly 2 brief bullet points or short sentences under each of these headers: **Symptoms**, **Organic Remedies**, **Chemical Remedies**, and **Prevention**.\n"
-            "- \"advisory_urdu\": A matching, highly premium, step-by-step crop-saving advisory in Urdu matching the English remedies, also formatted in clean markdown with the exact same headers: **علامات**, **نامیاتی علاج**, **کیمیائی علاج**, and **بچاؤ**."
-        )
+        if lang == 'ur':
+            system_prompt = (
+                "You are 'Dr. Crop AI', an expert crop pathologist in Pakistan.\n"
+                "Analyze the leaf image and identify the crop and disease. Return ONLY a valid JSON object.\n"
+                "CRITICAL: If the image does not show a plant or leaf clearly, or if it is too blurry/unclear to identify the crop and pathology, you MUST return:\n"
+                "{\n"
+                "  \"crop_type\": \"Unknown\",\n"
+                "  \"disease\": \"Invalid Image\",\n"
+                "  \"confidence\": 10,\n"
+                "  \"status\": \"Invalid\",\n"
+                "  \"advisory\": \"براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔\"\n"
+                "}\n\n"
+                "DIAGNOSTIC GUIDELINES:\n"
+                "1. Identify the crop species (e.g. 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.).\n"
+                "2. Diagnose the specific disease in Urdu transliteration in parentheses.\n"
+                "3. Provide exactly 2 brief bullet points in Urdu markdown under each of these headers: **علامات**, **نامیاتی علاج**, **کیمیائی علاج**, and **بچاؤ**.\n\n"
+                "JSON structure:\n"
+                "{\n"
+                "  \"crop_type\": \"crop name\",\n"
+                "  \"disease\": \"disease name (Urdu transliteration)\",\n"
+                "  \"confidence\": integer (50-100),\n"
+                "  \"status\": \"Healthy\" or \"Diseased\",\n"
+                "  \"advisory\": \"Markdown text using headers: **علامات**, **نامیاتی علاج**, **کیمیائی علاج**, **بچاؤ**\"\n"
+                "}"
+            )
+        else:
+            system_prompt = (
+                "You are 'Dr. Crop AI', an expert crop pathologist in Pakistan.\n"
+                "Analyze the leaf image and identify the crop and disease. Return ONLY a valid JSON object.\n"
+                "CRITICAL: If the image does not show a plant or leaf clearly, or if it is too blurry/unclear to identify the crop and pathology, you MUST return:\n"
+                "{\n"
+                "  \"crop_type\": \"Unknown\",\n"
+                "  \"disease\": \"Invalid Image\",\n"
+                "  \"confidence\": 10,\n"
+                "  \"status\": \"Invalid\",\n"
+                "  \"advisory\": \"Please upload a clear picture or a picture of a plant.\"\n"
+                "}\n\n"
+                "DIAGNOSTIC GUIDELINES:\n"
+                "1. Identify the crop species (e.g. 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Sugarcane', 'Maize', etc.).\n"
+                "2. Diagnose the specific disease with Urdu transliteration in parentheses.\n"
+                "3. Provide exactly 2 brief bullet points in English markdown under each of these headers: **Symptoms**, **Organic Remedies**, **Chemical Remedies**, and **Prevention**.\n\n"
+                "JSON structure:\n"
+                "{\n"
+                "  \"crop_type\": \"crop name\",\n"
+                "  \"disease\": \"disease name (Urdu transliteration)\",\n"
+                "  \"confidence\": integer (50-100),\n"
+                "  \"status\": \"Healthy\" or \"Diseased\",\n"
+                "  \"advisory\": \"Markdown text using headers: **Symptoms**, **Organic Remedies**, **Chemical Remedies**, **Prevention**\"\n"
+                "}"
+            )
 
         user_prompt = (
-            f"Perform a professional crop pathologist diagnosis on this crop leaf image. The user suspects it is '{crop_type}' from the '{region}' region, but verify the crop type yourself.\n"
-            "Inspect leaf shape, spots, necrotic spots, chlorotic halos, edges, and dust. Return ONLY a clean JSON object following the schema outlined in the system instruction."
+            f"Analyze leaf image for '{crop_type}' from '{region}'. Return ONLY JSON."
         )
 
-        logger.info("Dispatching image to Gemini Vision API (gemini-3.5-flash fallback chain)...")
+        logger.info("Dispatching image to Gemini Vision API (gemini-2.5-flash)...")
         gemini_resp = call_gemini_vision(
             prompt=user_prompt,
             base64_image=base64_image,
@@ -99,12 +136,103 @@ def predict(payload):
                 disease = parsed.get("disease", "Unknown")
                 confidence = float(parsed.get("confidence", 85.0))
                 status = parsed.get("status", "Diseased")
-                advisory_en = parsed.get("advisory_english", "Pathology detected. Consult expert.")
-                advisory_ur = parsed.get("advisory_urdu", "بیماری دیکھی گئی۔ ماہر سے رجوع کریں۔")
+                advisory_text = parsed.get("advisory", "Pathology detected. Consult expert.")
+                
+                # Check for low confidence or non-plant image rejection
+                if confidence < 50.0 or status.lower() == 'invalid' or 'invalid' in disease.lower() or 'clear' in advisory_text.lower() or 'پودے' in advisory_text:
+                    logger.warning(f"Scan validation rejected with low confidence={confidence}%, status={status}")
+                    error_msg = "Please upload a clear picture or a picture of a plant."
+                    if lang == 'ur':
+                        error_msg = "براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔"
+                    
+                    if chat_session_id:
+                        create_chat_message(
+                            user_id=user_id,
+                            chat_session_id=chat_session_id,
+                            title="Invalid Scan",
+                            message=f'/static/uploads/{filename}',
+                            sender='user',
+                            message_type='image',
+                            language=lang
+                        )
+                        create_chat_message(
+                            user_id=user_id,
+                            chat_session_id=chat_session_id,
+                            title="Invalid Scan",
+                            message=error_msg,
+                            sender='bot',
+                            message_type='text',
+                            language=lang
+                        )
+                    
+                    return jsonify({
+                        'status': 'success',
+                        'data': {
+                            'scan_id': None,
+                            'disease': 'Unclear Image' if lang == 'en' else 'غیر واضح تصویر',
+                            'confidence': round(confidence, 2),
+                            'status': 'Invalid',
+                            'advisory': error_msg,
+                            'assistant_message': error_msg,
+                            'image_url': f'/static/uploads/{filename}',
+                            'crop_type': 'Unknown'
+                        }
+                    }), 200
+
+                # Normal valid result parsing
+                if lang == 'ur':
+                    advisory_en = "No English advisory details available."
+                    advisory_ur = advisory_text
+                else:
+                    advisory_en = advisory_text
+                    advisory_ur = "کوئی اردو مشورہ دستیاب نہیں ہے۔"
+                
                 logger.info(f"✅ Gemini Vision successfully classified: {disease} for crop: {crop_type} ({confidence}%)")
             except Exception as parse_error:
                 logger.error(f"Failed to parse JSON from Gemini Vision: {parse_error}. Raw response: {gemini_resp}")
                 parsed = None
+                
+                # Check raw response for invalid/non-plant/blurry indicators
+                resp_lower = gemini_resp.lower() if gemini_resp else ""
+                if any(kw in resp_lower for kw in ["no plant", "invalid image", "no leaf", "blurry", "unclear", "not a plant", "not plant"]):
+                    logger.warning("Recommending rejection based on raw response keywords after JSON parse failure.")
+                    error_msg = "Please upload a clear picture or a picture of a plant."
+                    if lang == 'ur':
+                        error_msg = "براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔"
+                    
+                    if chat_session_id:
+                        create_chat_message(
+                            user_id=user_id,
+                            chat_session_id=chat_session_id,
+                            title="Invalid Scan",
+                            message=f'/static/uploads/{filename}',
+                            sender='user',
+                            message_type='image',
+                            language=lang
+                        )
+                        create_chat_message(
+                            user_id=user_id,
+                            chat_session_id=chat_session_id,
+                            title="Invalid Scan",
+                            message=error_msg,
+                            sender='bot',
+                            message_type='text',
+                            language=lang
+                        )
+                    
+                    return jsonify({
+                        'status': 'success',
+                        'data': {
+                            'scan_id': None,
+                            'disease': 'Unclear Image' if lang == 'en' else 'غیر واضح تصویر',
+                            'confidence': 10.0,
+                            'status': 'Invalid',
+                            'advisory': error_msg,
+                            'assistant_message': error_msg,
+                            'image_url': f'/static/uploads/{filename}',
+                            'crop_type': 'Unknown'
+                        }
+                    }), 200
 
         # Robust agronomist diagnostic fallback if Gemini Vision fails
         if not parsed:
@@ -112,7 +240,7 @@ def predict(payload):
             confidence = 75.0
             status = 'Diseased'
             if crop_type.lower() == 'wheat':
-                disease = 'Wheat Rust (پلی کنگی)'
+                disease = 'Wheat Rust (پیلی کنگی)'
                 advisory_en = 'Yellow/brown rust pustules detected on leaf surfaces. Apply recommended fungicide sprays like Tebuconazole (250 ml/acre) and avoid excess nitrogen fertilization.'
                 advisory_ur = 'پتوں کی سطح پر زرد یا بھورے دھبے دیکھے گئے۔ تجویز کردہ فنجی سائیڈ جیسے ٹیبوکونازول (250 ملی لیٹر فی ایکڑ) کا سپرے کریں اور نائٹروجن کھاد کا زیادہ استعمال نہ کریں۔'
             elif crop_type.lower() == 'rice':
@@ -127,6 +255,14 @@ def predict(payload):
                 disease = 'Generic Leaf Spot (پتوں کے دھبے)'
                 advisory_en = 'Generic fungal leaf spots identified. Apply organic copper sprays or systemic fungicides to prevent spore dissemination.'
                 advisory_ur = 'عام فنگل پتوں کے دھبے پائے گئے۔ اسپورز کے پھیلاؤ کو روکنے کے لیے آرگینک کاپر سپرے یا سسٹمک فنجی سائیڈز کا استعمال کریں۔'
+            
+            advisory_text = advisory_ur if lang == 'ur' else advisory_en
+            if lang == 'ur':
+                advisory_en = "No English advisory details available."
+                advisory_ur = advisory_text
+            else:
+                advisory_en = advisory_text
+                advisory_ur = "کوئی اردو مشورہ دستیاب نہیں ہے۔"
 
         # Store scan record in database
         logger.info(f"Storing scan record in database: disease={disease}, confidence={confidence}%, status={status}")
@@ -145,7 +281,7 @@ def predict(payload):
         logger.info(f"✅ Scan record successfully created with ID: {scan_id}")
 
         # Choose localized advisory text
-        advisory_display = advisory_ur if lang == 'ur' else advisory_en
+        advisory_display = advisory_text
 
         if chat_session_id:
             logger.info(f"Saving B2B diagnostics message history under session {chat_session_id}")

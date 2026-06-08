@@ -42,11 +42,32 @@ export async function apiFetch(endpoint, options = {}) {
     '/community/ai-calendar',
     '/planner/generate',
     '/wholesale/analyze',
-    '/wholesale/suggest-price'
+    '/wholesale/suggest-price',
+    '/dashboard/analytics',
+    '/dashboard/outbreaks',
+    '/dashboard/forecast',
+    '/history/scans',
+    '/history/crop-types',
+    '/chat/sessions',
+    '/chat/history',
+    '/weather/advisory',
+    '/community/posts',
+    '/community/marketplace'
   ];
-  const isCacheable = method === 'GET' || cacheableEndpoints.some(e => endpoint.startsWith(e));
+  
+  // Specific POST endpoints that generate AI advisories/plans and are read-like
+  const postCacheableEndpoints = [
+    '/community/ai-calendar',
+    '/planner/generate',
+    '/wholesale/analyze',
+    '/wholesale/suggest-price',
+    '/dashboard/forecast'
+  ];
 
-  // Invalidate cache on any state-changing operations
+  const isCacheable = (method === 'GET' && cacheableEndpoints.some(e => endpoint.startsWith(e))) ||
+                      (method === 'POST' && postCacheableEndpoints.some(e => endpoint.startsWith(e)));
+
+  // Invalidate cache on any state-changing write operations (POST, PUT, DELETE)
   if (!isCacheable) {
     console.log(`[Cache Invalidation] Clearing cache due to write operation: ${method} ${endpoint}`);
     apiCache.clear();
@@ -54,9 +75,10 @@ export async function apiFetch(endpoint, options = {}) {
 
   // Check cache for GET or cacheable POST requests
   const cacheKey = `${authToken || ''}:${endpoint}?${options.body ? (typeof options.body === 'string' ? options.body : JSON.stringify(options.body)) : ''}`;
-  if (isCacheable) {
+  const forceRefresh = options.forceRefresh || false;
+  if (isCacheable && !forceRefresh) {
     const cached = apiCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    if (cached) {
       console.log(`[Cache Hit] Returning cached response for: ${endpoint}`);
       return cached.data;
     }
@@ -149,35 +171,35 @@ export async function apiLogout() {
 }
 
 // ====== DASHBOARD ENDPOINTS ======
-export async function apiGetAnalytics() {
-  return apiFetch('/dashboard/analytics');
+export async function apiGetAnalytics(forceRefresh = false) {
+  return apiFetch('/dashboard/analytics', { forceRefresh });
 }
 
-export async function apiGetOutbreaks() {
-  return apiFetch('/dashboard/outbreaks');
+export async function apiGetOutbreaks(forceRefresh = false) {
+  return apiFetch('/dashboard/outbreaks', { forceRefresh });
 }
 
 // ====== HISTORY ENDPOINTS ======
-export async function apiGetHistory(params = {}) {
+export async function apiGetHistory(params = {}, forceRefresh = false) {
   const q = new URLSearchParams({ page: 1, per_page: 50, ...params });
-  return apiFetch(`/history/scans?${q}`);
+  return apiFetch(`/history/scans?${q}`, { forceRefresh });
 }
 
-export async function apiGetScan(id) {
-  return apiFetch(`/history/scans/${id}`);
+export async function apiGetScan(id, forceRefresh = false) {
+  return apiFetch(`/history/scans/${id}`, { forceRefresh });
 }
 
-export async function apiGetCropTypes() {
-  return apiFetch('/history/crop-types');
+export async function apiGetCropTypes(forceRefresh = false) {
+  return apiFetch('/history/crop-types', { forceRefresh });
 }
 
 // ====== CHAT ENDPOINTS ======
-export async function apiGetChatSessions() {
-  return apiFetch('/chat/sessions');
+export async function apiGetChatSessions(forceRefresh = false) {
+  return apiFetch('/chat/sessions', { forceRefresh });
 }
 
-export async function apiGetChatHistory(sessionId) {
-  return apiFetch(`/chat/history/${sessionId}`);
+export async function apiGetChatHistory(sessionId, forceRefresh = false) {
+  return apiFetch(`/chat/history/${sessionId}`, { forceRefresh });
 }
 
 export async function apiSendChat(message, chatSessionId, language) {
@@ -243,8 +265,8 @@ export async function apiScanImage(formData) {
 }
 
 // ====== COMMUNITY & MARKETPLACE ENDPOINTS ======
-export async function apiGetCommunityPosts() {
-  return apiFetch('/community/posts');
+export async function apiGetCommunityPosts(forceRefresh = false) {
+  return apiFetch('/community/posts', { forceRefresh });
 }
 
 export async function apiCreateCommunityPost(title, content, category = 'General') {
@@ -254,8 +276,8 @@ export async function apiCreateCommunityPost(title, content, category = 'General
   });
 }
 
-export async function apiGetComments(postId) {
-  return apiFetch(`/community/posts/${postId}/comments`);
+export async function apiGetComments(postId, forceRefresh = false) {
+  return apiFetch(`/community/posts/${postId}/comments`, { forceRefresh });
 }
 
 export async function apiCreateComment(postId, content) {
@@ -271,9 +293,9 @@ export async function apiLikePost(postId) {
   });
 }
 
-export async function apiGetMarketplace(category = 'All') {
+export async function apiGetMarketplace(category = 'All', forceRefresh = false) {
   const q = new URLSearchParams({ category });
-  return apiFetch(`/community/marketplace?${q}`);
+  return apiFetch(`/community/marketplace?${q}`, { forceRefresh });
 }
 
 export async function apiCreateMarketplaceItem(data) {
@@ -290,10 +312,11 @@ export async function apiDeleteMarketplaceItem(itemId) {
 }
 
 // ====== AI FARMER CLIENT WRAPPERS ======
-export async function apiGetAICalendar(crop, month, language = 'en') {
+export async function apiGetAICalendar(crop, month, language = 'en', forceRefresh = false) {
   return apiFetch('/community/ai-calendar', {
     method: 'POST',
     body: JSON.stringify({ crop, month, language }),
+    forceRefresh
   });
 }
 
@@ -320,8 +343,8 @@ export async function apiAnalyzeWholesaleDeal(itemId, language = 'en') {
 }
 
 // ====== AI WEATHER ADVISORY (Gemini 2.5 Flash + Open-Meteo) ======
-export async function apiGetWeatherAdvisory(lang = 'en') {
-  return apiFetch(`/weather/advisory?lang=${lang}`);
+export async function apiGetWeatherAdvisory(lang = 'en', forceRefresh = false) {
+  return apiFetch(`/weather/advisory?lang=${lang}`, { forceRefresh });
 }
 
 // ====== AI PRICE PREDICTION (Gemini 2.5 Flash) ======
@@ -333,7 +356,25 @@ export async function apiSuggestPrice(data) {
 }
 
 // ====== AI OUTBREAK FORECASTING (Gemini 2.5 Flash + GIS Heatmap) ======
-export async function apiGetOutbreakForecast() {
-  return apiFetch('/dashboard/forecast');
+export async function apiGetOutbreakForecast(forceRefresh = false) {
+  return apiFetch('/dashboard/forecast', { forceRefresh });
+}
+
+// ====== ADMIN ENDPOINTS ======
+export async function apiAdminGetUsers() {
+  return apiFetch('/admin/users');
+}
+
+export async function apiAdminUpdateUser(userId, data) {
+  return apiFetch(`/admin/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiAdminDeleteUser(userId) {
+  return apiFetch(`/admin/users/${userId}`, {
+    method: 'DELETE',
+  });
 }
 

@@ -50,6 +50,12 @@ export function renderSidebar(container) {
         <i class="fas fa-gear"></i>
         <span class="sidebar-btn-text">${isUr ? 'ترتیبات' : 'Settings'}</span>
       </button>
+      ${state.user && state.user.is_admin === 1 ? `
+      <button class="sidebar-btn admin-only-btn" data-page="admin" type="button" title="${isUr ? 'ایڈمن پینل' : 'Admin Panel'}" aria-label="${isUr ? 'ایڈمن پینل' : 'Admin Panel'}" style="background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--danger);">
+        <i class="fas fa-user-shield" style="color: var(--danger);"></i>
+        <span class="sidebar-btn-text" style="color: var(--danger); font-weight: 600;">${isUr ? 'ایڈمن پینل' : 'Admin Panel'}</span>
+      </button>
+      ` : ''}
     </div>
     <div class="sidebar-spacer"></div>
     <button class="sidebar-btn" data-action="logout" type="button" title="${isUr ? 'لاگ آؤٹ' : 'Logout'}" aria-label="${isUr ? 'لاگ آؤٹ' : 'Logout'}">

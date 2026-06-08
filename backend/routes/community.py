@@ -15,7 +15,19 @@ community_bp = Blueprint('community', __name__, url_prefix='/api/v1/community')
 def list_posts():
     """Retrieve all forum posts"""
     try:
-        posts = get_community_posts() or []
+        from utils.auth_utils import verify_token
+        user_id = None
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+                payload = verify_token(token)
+                if payload:
+                    user_id = payload.get('user_id')
+            except Exception:
+                pass
+
+        posts = get_community_posts(user_id) or []
         # Format timestamps
         for post in posts:
             if 'created_at' in post and hasattr(post['created_at'], 'isoformat'):
@@ -71,8 +83,9 @@ def add_post(payload):
 @community_bp.route('/posts/<int:post_id>/like', methods=['POST'])
 @token_required
 def like_post(payload, post_id):
-    """Like a forum post"""
+    """Like/Unlike a forum post"""
     try:
+        user_id = payload['user_id']
         post = get_community_post_by_id(post_id)
         if not post:
             return jsonify({
@@ -80,10 +93,12 @@ def like_post(payload, post_id):
                 'message': 'Post not found'
             }), 404
             
-        like_community_post(post_id)
+        action, new_likes_count = like_community_post(post_id, user_id)
         return jsonify({
             'status': 'success',
-            'message': 'Post liked'
+            'action': action,
+            'likes_count': new_likes_count,
+            'message': f'Post {action} successfully'
         }), 200
     except Exception as e:
         return jsonify({
@@ -250,29 +265,17 @@ def remove_marketplace_item(payload, item_id):
 
 # ======================== AI FARMER INTEGRATIONS ========================
 
-import time
 from utils.groq_client import call_groq_completions
-
-AI_RATE_LIMITS = {}
+from utils.rate_limit import rate_limit
 
 @community_bp.route('/ai-calendar', methods=['POST'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def get_ai_calendar(payload):
     """Retrieve summarized AI seasonal calendar crop advice from Groq"""
     try:
         user_id = payload['user_id']
-        now = time.time()
-        
-        # Cooldown rate limit check
-        if user_id in AI_RATE_LIMITS:
-            last_req = AI_RATE_LIMITS[user_id]
-            if now - last_req < 12:  # 12 second request cool-down
-                return jsonify({
-                    'status': 'error',
-                    'message': 'AI Rate Limit: Please wait 12 seconds between AI consultations.'
-                }), 429
-                
-        AI_RATE_LIMITS[user_id] = now
         
         data = request.get_json() or {}
         crop = data.get('crop')
@@ -287,14 +290,13 @@ def get_ai_calendar(payload):
             }), 400
             
         system_prompt = (
-            "You are an elite, senior Pakistani Agronomist and Crop Scientist. "
-            "Provide highly legitimate, scientifically accurate, and seasonal farming advice for the crop in the requested month. "
-            "Keep the output extremely short, structured, and under 120 words / 4-5 sentences max."
+            "You are a senior Pakistani Agronomist. Provide accurate seasonal crop cultivation advice. "
+            "Keep the output extremely short (under 100 words, 3 sentences max) without formatting headers."
         )
         
-        user_prompt = f"Provide detailed agronomy calendar guidelines for cultivating '{crop}' during '{month}' in Pakistan."
+        user_prompt = f"Provide agronomy calendar guidelines for '{crop}' during '{month}' in Pakistan."
         if is_ur:
-            user_prompt += " Please write the advice in elegant, simple, farmer-friendly Urdu (اردو)."
+            user_prompt += " Write in simple Urdu."
             
         messages = [
             {"role": "system", "content": system_prompt},
@@ -302,7 +304,7 @@ def get_ai_calendar(payload):
         ]
         
         # Call Groq completion engine
-        ai_response = call_groq_completions(messages, max_tokens=250, temperature=0.6)
+        ai_response = call_groq_completions(messages, max_tokens=150, temperature=0.6)
         if not ai_response:
             return jsonify({
                 'status': 'error',
@@ -326,23 +328,12 @@ def get_ai_calendar(payload):
 
 @community_bp.route('/posts/<int:post_id>/ai-diagnose', methods=['POST'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def post_ai_diagnose(payload, post_id):
     """Diagnose community post crop issue using Groq and post comment response"""
     try:
         user_id = payload['user_id']
-        now = time.time()
-        
-        # Rate limit cooldown check
-        if user_id in AI_RATE_LIMITS:
-            last_req = AI_RATE_LIMITS[user_id]
-            if now - last_req < 15:  # 15 second request cool-down for complex LLM tasks
-                return jsonify({
-                    'status': 'error',
-                    'message': 'AI Rate Limit: Please wait 15 seconds between diagnostic tasks.'
-                }), 429
-                
-        AI_RATE_LIMITS[user_id] = now
-        
         post = get_community_post_by_id(post_id)
         if not post:
             return jsonify({
@@ -361,22 +352,20 @@ def post_ai_diagnose(payload, post_id):
                 
         # Call Groq to synthesize diagnosis
         system_prompt = (
-            "You are 'Dr. Crop AI', an eminent crop pathologist and plant surgeon. "
-            "Diagnose the following farmer's field inquiry. Provide legitimate, highly practical scientific advice, "
-            "preventative spray options (both organic and pesticide), and next steps. "
-            "Write the response in an engaging, empathetic, structured layout. Highlight the diagnosis and remedy clearly. "
-            "Keep the response concise and structured, under 150 words total (4-5 sentences max). "
-            "Add a warm signature: '⚡ Dr. Crop AI Diagnostic Clinic'."
+            "You are 'Dr. Crop AI', a crop pathologist. Diagnose the farmer's inquiry. "
+            "Provide brief advice, remedies, and organic/pesticide options. "
+            "Keep the response highly concise, under 100 words, and structured. "
+            "Add signature: '⚡ Dr. Crop AI'."
         )
         
-        user_prompt = f"Farmer Inquiry Title: {post['title']}\nInquiry Details: {post['content']}"
+        user_prompt = f"Inquiry Title: {post['title']}\nDetails: {post['content']}"
         
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
         
-        ai_response = call_groq_completions(messages, max_tokens=300, temperature=0.7)
+        ai_response = call_groq_completions(messages, max_tokens=200, temperature=0.7)
         if not ai_response:
             return jsonify({
                 'status': 'error',

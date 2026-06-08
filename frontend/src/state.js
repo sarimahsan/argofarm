@@ -58,6 +58,9 @@ export function clearUser() {
   state.authToken = null;
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
+  import('./api.js').then(({ clearApiCache }) => {
+    clearApiCache();
+  }).catch(err => console.error("Error clearing API cache on logout:", err));
   state._listeners.forEach(fn => fn(state));
 }
 

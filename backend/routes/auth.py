@@ -9,17 +9,25 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 def register():
     """Register new user"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         
+        # Default password if not provided
+        if 'password' not in data:
+            data['password'] = 'abc123'
+            
         # Validate input
-        if not data or not all(k in data for k in ['name', 'email', 'password']):
+        if not all(k in data for k in ['name', 'email', 'password']):
             return jsonify({
                 'status': 'error',
-                'message': 'Missing required fields: name, email, password'
+                'message': 'Missing required fields: name, email'
             }), 400
         
+        # Normalize email
+        email_normalized = data['email'].strip().lower()
+        data['email'] = email_normalized
+        
         # Check if user exists
-        if get_user_by_email(data['email']):
+        if get_user_by_email(email_normalized):
             return jsonify({
                 'status': 'error',
                 'message': 'Email already registered'
@@ -28,7 +36,7 @@ def register():
         # Create new user
         user_id = create_user(
             name=data['name'],
-            email=data['email'],
+            email=email_normalized,
             password=hash_password(data['password']),
             phone=data.get('phone'),
             region=data.get('region'),
@@ -46,9 +54,13 @@ def register():
         
         # Send welcome email (non-blocking)
         send_welcome_email(
-            recipient_email=data['email'],
-            user_name=data['name'].split()[0]  # First name only
+            recipient_email=email_normalized,
+            user_name=data['name'].split()[0],  # First name only
+            password=data['password']
         )
+        
+        # Retrieve newly created user to return accurate database status (e.g. bootstrapped is_admin)
+        user_record = get_user_by_id(user_id)
         
         return jsonify({
             'status': 'success',
@@ -57,19 +69,22 @@ def register():
                 'user': {
                     'id': user_id,
                     'name': data['name'],
-                    'email': data['email'],
+                    'email': email_normalized,
                     'phone': data.get('phone'),
                     'region': data.get('region'),
-                    'crop_types': data.get('crop_types', [])
+                    'crop_types': data.get('crop_types', []),
+                    'is_admin': user_record.get('is_admin', 0) if user_record else 0,
+                    'ai_limit': user_record.get('ai_limit', 50) if user_record else 50
                 },
                 'token': token
             }
         }), 201
         
     except Exception as e:
+        print(f"Registration error: {e}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': 'Connection error'
         }), 500
 
 @auth_bp.route('/login', methods=['POST'])
@@ -85,13 +100,22 @@ def login():
                 'message': 'Missing required fields: email, password'
             }), 400
         
-        # Find user
-        user = get_user_by_email(data['email'])
+        # Normalize email
+        email_normalized = data['email'].strip().lower()
         
-        if not user or not verify_password(data['password'], user['password']):
+        # Find user
+        user = get_user_by_email(email_normalized)
+        
+        if not user:
             return jsonify({
                 'status': 'error',
-                'message': 'Invalid email or password'
+                'message': 'Email incorrect'
+            }), 401
+            
+        if not verify_password(data['password'], user['password']):
+            return jsonify({
+                'status': 'error',
+                'message': 'Password incorrect'
             }), 401
         
         # Generate token
@@ -107,16 +131,19 @@ def login():
                     'email': user['email'],
                     'phone': user['phone'],
                     'region': user['region'],
-                    'crop_types': user.get('crop_types', [])
+                    'crop_types': user.get('crop_types', []),
+                    'is_admin': user.get('is_admin', 0),
+                    'ai_limit': user.get('ai_limit', 50)
                 },
                 'token': token
             }
         }), 200
         
     except Exception as e:
+        print(f"Login error: {e}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': 'Connection error'
         }), 500
 
 @auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
@@ -158,7 +185,9 @@ def get_profile(payload):
                 'email': user['email'],
                 'phone': user.get('phone'),
                 'region': user.get('region'),
-                'crop_types': crop_types
+                'crop_types': crop_types,
+                'is_admin': user.get('is_admin', 0),
+                'ai_limit': user.get('ai_limit', 50)
             }
         }), 200
     except Exception as e:
@@ -209,7 +238,9 @@ def update_profile(payload):
                     'email': updated_user['email'],
                     'phone': updated_user.get('phone'),
                     'region': updated_user.get('region'),
-                    'crop_types': crop_types
+                    'crop_types': crop_types,
+                    'is_admin': updated_user.get('is_admin', 0),
+                    'ai_limit': updated_user.get('ai_limit', 50)
                 }
             }
         }), 200
@@ -229,8 +260,11 @@ def forgot_password():
                 'message': 'Email is required'
             }), 400
         
+        # Normalize email
+        email_normalized = data['email'].strip().lower()
+        
         # Find user
-        user = get_user_by_email(data['email'])
+        user = get_user_by_email(email_normalized)
         if not user:
             return jsonify({
                 'status': 'success',
@@ -258,9 +292,10 @@ def forgot_password():
         }), 200
         
     except Exception as e:
+        print(f"Forgot password error: {e}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': 'Connection error'
         }), 500
 
 @auth_bp.route('/change-password', methods=['POST'])

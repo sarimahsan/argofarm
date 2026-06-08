@@ -53,13 +53,21 @@ export async function mountCommunity(container) {
   async function handleLike(postId, buttonEl) {
     const result = await apiLikePost(postId);
     if (result && result.status === 'success') {
-      showToast(isUr ? 'پوسٹ کو پسند کیا گیا' : 'Post liked!');
-      // Instantly update UI counter locally
+      const action = result.action;
+      const likesCount = result.likes_count;
+      
       const counter = buttonEl.querySelector('.like-count');
       if (counter) {
-        counter.textContent = parseInt(counter.textContent) + 1;
+        counter.textContent = likesCount;
       }
-      buttonEl.style.color = 'var(--danger)';
+      
+      if (action === 'liked') {
+        showToast(isUr ? 'پوسٹ کو پسند کیا گیا' : 'Post liked!');
+        buttonEl.style.color = 'var(--danger)';
+      } else {
+        showToast(isUr ? 'پسندیدگی ختم کر دی گئی' : 'Post unliked!');
+        buttonEl.style.color = 'var(--fg-muted)';
+      }
     }
   }
 
@@ -175,45 +183,95 @@ export async function mountCommunity(container) {
   async function renderForum() {
     const forumContainer = document.createElement('div');
     forumContainer.innerHTML = `
-      <div class="dash-grid-2" style="align-items:start;">
-        <!-- New Post Form Panel -->
-        <div class="card" style="padding:20px;height:fit-content;">
-          <h2 style="font-size:16px;font-weight:700;margin-bottom:14px;color:var(--accent);">
-            <i class="fas fa-pen-nib"></i> ${isUr ? 'نیا سوال پوچھیں' : 'Ask a Question'}
-          </h2>
-          <form id="newPostForm" style="display:flex;flex-direction:column;gap:12px;">
-            <div>
-              <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;">${isUr ? 'عنوان' : 'Title / Subject'}</label>
-              <input type="text" id="postTitle" class="form-input" style="width:100%;" placeholder="${isUr ? 'گندم کی پیلی کنگی کے تدارک کے لیے کیا کروں؟' : 'e.g., Best nitrogen fertilizer ratio for Rice seedlings'}" required />
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;">${isUr ? 'زمرہ' : 'Category'}</label>
-              <select id="postCategory" class="form-input" style="width:100%;background:var(--bg-input);cursor:pointer;color-scheme:dark;">
-                <option value="Disease Control">${isUr ? 'بیماریوں کا تدارک' : 'Disease Control'}</option>
-                <option value="Irrigation">${isUr ? 'آبپاشی' : 'Irrigation'}</option>
-                <option value="Fertilizer">${isUr ? 'کھادوں کا استعمال' : 'Fertilizers'}</option>
-                <option value="Seeds">${isUr ? 'بہترین بیج' : 'Seeds'}</option>
-                <option value="General" selected>${isUr ? 'عام گفتگو' : 'General'}</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--fg-muted);display:block;margin-bottom:4px;font-weight:600;text-transform:uppercase;">${isUr ? 'اپنا سوال تفصیلاً لکھیں' : 'Explain your inquiry'}</label>
-              <textarea id="postContent" class="form-input" rows="4" style="width:100%;resize:none;" placeholder="${isUr ? 'اپنی فصل کے مسائل اور علامات تفصیلاً بیان کریں...' : 'Explain symptoms, weather, crop age, and what treatments you have tried...'}" required></textarea>
-            </div>
-            <button class="btn btn-accent" type="submit" style="width:100%;padding:12px;margin-top:4px;">
-              <i class="fas fa-paper-plane"></i> ${isUr ? 'فورم پر شیئر کریں' : 'Share on Forum'}
-            </button>
-          </form>
-        </div>
+      <style>
+        .forum-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 24px;
+          align-items: start;
+        }
+        
+        .post-form-col {
+          order: 2;
+          display: none; /* Hidden by default on mobile */
+        }
+        
+        .feed-col {
+          order: 1;
+        }
 
+        .mobile-form-toggle {
+          display: block;
+          margin-bottom: 16px;
+        }
+
+        @media (min-width: 1024px) {
+          .forum-grid {
+            grid-template-columns: 1.8fr 1fr;
+          }
+          
+          .post-form-col {
+            order: 2;
+            display: block !important;
+          }
+          
+          .feed-col {
+            order: 1;
+          }
+
+          .mobile-form-toggle {
+            display: none;
+          }
+        }
+      </style>
+
+      <div class="mobile-form-toggle">
+        <button id="toggleMobileFormBtn" class="btn btn-accent" style="width: 100%; height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+          <i class="fas fa-edit"></i> ${isUr ? 'سوال پوچھیں / پوسٹ کریں' : 'Write a Post / Ask a Question'}
+        </button>
+      </div>
+
+      <div class="forum-grid">
         <!-- Feed List Panel -->
-        <div style="display:flex;flex-direction:column;gap:18px;">
-          <h2 style="font-size:17px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:8px;">
-            <i class="fas fa-comments-dollar" style="color:var(--accent);"></i> Discussions Feed
+        <div class="feed-col" style="display:flex; flex-direction:column; gap:18px;">
+          <h2 style="font-size:17px; font-weight:700; margin-bottom:2px; display:flex; align-items:center; gap:8px;">
+            <i class="fas fa-comments" style="color:var(--accent);"></i> ${isUr ? 'برادری فورم فیڈ' : 'Discussions Feed'}
           </h2>
           
-          <div id="forumPostsFeed" style="display:flex;flex-direction:column;gap:16px;">
-            <div style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i></div>
+          <div id="forumPostsFeed" style="display:flex; flex-direction:column; gap:16px;">
+            <div style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i></div>
+          </div>
+        </div>
+
+        <!-- New Post Form Panel -->
+        <div class="post-form-col" id="postFormCol">
+          <div class="card" style="padding:20px; height:fit-content; border:1px solid var(--border);">
+            <h2 style="font-size:16px; font-weight:700; margin-bottom:14px; color:var(--accent);">
+              <i class="fas fa-pen-nib"></i> ${isUr ? 'نیا سوال پوچھیں' : 'Ask a Question'}
+            </h2>
+            <form id="newPostForm" style="display:flex; flex-direction:column; gap:12px;">
+              <div>
+                <label style="font-size:11px; color:var(--fg-muted); display:block; margin-bottom:4px; font-weight:600; text-transform:uppercase;">${isUr ? 'عنوان' : 'Title / Subject'}</label>
+                <input type="text" id="postTitle" class="form-input" style="width:100%;" placeholder="${isUr ? 'گندم کی پیلی کنگی کے تدارک کے لیے کیا کروں؟' : 'e.g., Best nitrogen fertilizer ratio for Rice seedlings'}" required />
+              </div>
+              <div>
+                <label style="font-size:11px; color:var(--fg-muted); display:block; margin-bottom:4px; font-weight:600; text-transform:uppercase;">${isUr ? 'زمرہ' : 'Category'}</label>
+                <select id="postCategory" class="form-input" style="width:100%; background:var(--bg-input); cursor:pointer; color-scheme:dark;">
+                  <option value="Disease Control">${isUr ? 'بیماریوں کا تدارک' : 'Disease Control'}</option>
+                  <option value="Irrigation">${isUr ? 'آبپاشی' : 'Irrigation'}</option>
+                  <option value="Fertilizer">${isUr ? 'کھادوں کا استعمال' : 'Fertilizers'}</option>
+                  <option value="Seeds">${isUr ? 'بہترین بیج' : 'Seeds'}</option>
+                  <option value="General" selected>${isUr ? 'عام گفتگو' : 'General'}</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px; color:var(--fg-muted); display:block; margin-bottom:4px; font-weight:600; text-transform:uppercase;">${isUr ? 'اپنا سوال تفصیلاً لکھیں' : 'Explain your inquiry'}</label>
+                <textarea id="postContent" class="form-input" rows="4" style="width:100%; resize:none;" placeholder="${isUr ? 'اپنی فصل کے مسائل اور علامات تفصیلاً بیان کریں...' : 'Explain symptoms, weather, crop age, and what treatments you have tried...'}" required></textarea>
+              </div>
+              <button class="btn btn-accent" type="submit" style="width:100%; padding:12px; margin-top:4px;">
+                <i class="fas fa-paper-plane"></i> ${isUr ? 'فورم پر شیئر کریں' : 'Share on Forum'}
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -221,54 +279,67 @@ export async function mountCommunity(container) {
 
     main.appendChild(forumContainer);
 
+    // Toggle Mobile Form Event
+    const toggleFormBtn = forumContainer.querySelector('#toggleMobileFormBtn');
+    const postFormCol = forumContainer.querySelector('#postFormCol');
+    if (toggleFormBtn && postFormCol) {
+      toggleFormBtn.addEventListener('click', () => {
+        const isHidden = window.getComputedStyle(postFormCol).display === 'none';
+        postFormCol.style.display = isHidden ? 'block' : 'none';
+        toggleFormBtn.innerHTML = isHidden
+          ? `<i class="fas fa-xmark"></i> ${isUr ? 'بند کریں' : 'Close Question Form'}`
+          : `<i class="fas fa-edit"></i> ${isUr ? 'نیا سوال پوچھیں / پوسٹ کریں' : 'Write a Post / Ask a Question'}`;
+      });
+    }
+
     // Load and render posts
     await loadForumData();
 
     const feedEl = forumContainer.querySelector('#forumPostsFeed');
     if (!posts.length) {
       feedEl.innerHTML = `
-        <div class="card" style="padding:40px;text-align:center;color:var(--fg-muted);">
-          <i class="fas fa-users-slash fa-3x" style="margin-bottom:12px;color:var(--border);"></i>
+        <div class="card" style="padding:40px; text-align:center; color:var(--fg-muted);">
+          <i class="fas fa-users-slash fa-3x" style="margin-bottom:12px; color:var(--border);"></i>
           <div>No discussions found. Be the first to share a post!</div>
         </div>
       `;
     } else {
       feedEl.innerHTML = posts.map(p => `
-        <div class="card post-card" data-id="${p.id}" style="padding:20px;border-left:3px solid var(--accent);position:relative;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div style="width:36px;height:36px;border-radius:50%;background:rgba(46,204,64,0.1);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:1px solid var(--border);">
+        <div class="card post-card" data-id="${p.id}" style="padding:20px; border-left:3px solid var(--accent); position:relative;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:36px; height:36px; border-radius:50%; background:rgba(46,204,64,0.1); color:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; border:1px solid var(--border);">
                 ${p.author_name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <strong style="font-size:13px;color:var(--fg);">${p.author_name}</strong>
-                <div style="font-size:10px;color:var(--fg-muted);">${formatDate(p.created_at)}</div>
+                <strong style="font-size:13px; color:var(--fg);">${p.author_name}</strong>
+                <div style="font-size:10px; color:var(--fg-muted);">${formatDate(p.created_at)}</div>
               </div>
             </div>
             <span class="badge badge-green" style="font-size:10px;">${p.category}</span>
           </div>
           
-          <h3 style="font-size:15px;font-weight:700;color:var(--fg);margin-bottom:8px;line-height:1.4;">${p.title}</h3>
-          <p style="font-size:13px;color:var(--fg);line-height:1.6;margin-bottom:14px;white-space:pre-wrap;text-align:justify;">${p.content}</p>
+          <h3 style="font-size:15px; font-weight:700; color:var(--fg); margin-bottom:8px; line-height:1.4;">${p.title}</h3>
+          <p style="font-size:13px; color:var(--fg); line-height:1.6; margin-bottom:14px; white-space:pre-wrap; text-align:justify;">${p.content}</p>
           
           <!-- Actions Footer -->
-          <div style="display:flex;gap:12px 18px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
-            <button class="btn btn-sm btn-outline like-btn" style="border:none;background:none;padding:2px 8px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--fg-muted);" type="button">
+          <div style="display:flex; gap:12px 18px; flex-wrap:wrap; border-top:1px solid var(--border); padding-top:12px; margin-top:8px;">
+            <button class="btn btn-sm btn-outline like-btn" style="border:none; background:none; padding:2px 8px; display:flex; align-items:center; gap:6px; cursor:pointer; color:${p.liked_by_user ? 'var(--danger)' : 'var(--fg-muted)'};" type="button">
               <i class="fas fa-heart"></i> Love (<span class="like-count">${p.likes_count || 0}</span>)
             </button>
-            <button class="btn btn-sm btn-outline comment-btn" style="border:none;background:none;padding:2px 8px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--fg-muted);" type="button">
+            <button class="btn btn-sm btn-outline comment-btn" style="border:none; background:none; padding:2px 8px; display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--fg-muted);" type="button">
               <i class="fas fa-comment"></i> Comments (<span class="comment-count-badge">${p.comment_count || 0}</span>)
             </button>
-            <button class="btn btn-sm btn-outline ai-diagnose-btn" style="border:none;background:none;padding:2px 8px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--accent);font-weight:600;" type="button">
+            <button class="btn btn-sm btn-outline ai-diagnose-btn" style="border:none; background:none; padding:2px 8px; display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--accent); font-weight:600;" type="button">
               <i class="fas fa-wand-magic-sparkles"></i> ${isUr ? 'اے آئی معائنہ' : 'AI Diagnose'}
             </button>
           </div>
 
           <!-- Comments Drawer (Hidden initially) -->
-          <div class="comments-drawer" style="display:none;margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">
-            <div class="comments-list" style="max-height:220px;overflow-y:auto;margin-bottom:12px;padding-right:4px;"></div>
-            <div style="display:flex;gap:8px;">
-              <input type="text" class="form-input comment-input" style="flex:1;padding:8px 12px;font-size:12px;" placeholder="${isUr ? 'تبصرہ لکھیں...' : 'Write a comment...'}" />
+          <div class="comments-drawer" style="display:none; margin-top:16px; padding-top:14px; border-top:1px dashed var(--border);">
+            <div class="comments-list" style="max-height:220px; overflow-y:auto; margin-bottom:12px; padding-right:4px;"></div>
+            <div style="display:flex; gap:8px;">
+              <input type="text" class="form-input comment-input" style="flex:1; padding:8px 12px; font-size:12px;" placeholder="${isUr ? 'تبصرہ لکھیں...' : 'Write a comment...'}" />
               <button class="btn btn-sm btn-accent send-comment-btn" type="button" style="padding:8px 14px;"><i class="fas fa-paper-plane"></i></button>
             </div>
           </div>
@@ -375,8 +446,8 @@ export async function mountCommunity(container) {
       </div>
 
       <!-- List Item Modal overlay -->
-      <div class="modal-overlay" id="marketProductModal" style="display:none;z-index:1000;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);position:fixed;top:0;left:0;width:100%;height:100%;align-items:center;justify-content:center;">
-        <div class="card" style="width:100%;max-width:480px;padding:24px;border:1px solid var(--border);position:relative;">
+      <div class="modal-overlay" id="marketProductModal" style="display:none;">
+        <div class="modal" style="max-width:480px;">
           <button class="icon-btn" id="closeMarketModalBtn" type="button" style="position:absolute;top:14px;right:14px;background:none;border:none;color:var(--fg-muted);"><i class="fas fa-xmark fa-lg"></i></button>
           <h2 style="font-size:18px;font-weight:800;color:var(--accent);margin-bottom:16px;">
             <i class="fas fa-cart-plus"></i> ${isUr ? 'فروخت کے لیے چیز شامل کریں' : 'List Product for Sale'}

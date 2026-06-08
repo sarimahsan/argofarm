@@ -174,13 +174,13 @@ export async function mountWholesale(container) {
         </span>
       </div>
 
-      <div id="wholesaleGridContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:24px;margin-bottom:40px;">
+      <div id="wholesaleGridContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(270px, 1fr));gap:24px;margin-bottom:40px;">
         <div style="text-align:center;grid-column:1/-1;padding:50px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--accent);"></i><div style="margin-top:10px;font-size:12px;color:var(--fg-muted);">${strings.loadingList}</div></div>
       </div>
 
       <!-- AI Deal Advisor Modal Overlay -->
-      <div class="modal-overlay" id="aiDealModal" style="display:none;z-index:1000;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);position:fixed;top:0;left:0;width:100%;height:100%;align-items:center;justify-content:center;padding:16px;">
-        <div class="card" style="width:100%;max-width:540px;max-height:85vh;overflow-y:auto;padding:26px;border:1px solid var(--border);position:relative;animation:pageIn 0.3s forwards;">
+      <div class="modal-overlay" id="aiDealModal" style="display:none;">
+        <div class="modal" style="max-width:540px;">
           <button class="icon-btn" id="closeDealModalBtn" type="button" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--fg-muted);cursor:pointer;"><i class="fas fa-xmark fa-lg"></i></button>
           
           <h2 style="font-size:18px;font-weight:800;color:var(--accent);margin-bottom:18px;display:flex;align-items:center;gap:8px;">

@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from utils.auth_utils import token_required
+from utils.rate_limit import rate_limit
 from utils.groq_client import call_groq_completions
 import logging
 
@@ -9,6 +10,8 @@ planner_bp = Blueprint('planner', __name__, url_prefix='/api/v1/planner')
 
 @planner_bp.route('/generate', methods=['POST'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def generate_crop_plan(payload):
     """Generate a structured 4-month crop plan timeline using Groq AI"""
     try:
@@ -24,35 +27,16 @@ def generate_crop_plan(payload):
         logger.info(f"Generating crop plan for user {user_id}: {crop_type}, {land_size} acres, Rs. {budget}, Water: {water_availability}, Lang: {lang}")
         
         system_prompt = (
-            "You are a professional senior agronomist and agricultural planner in Pakistan.\n"
-            "The user is a local farmer requesting a highly customized, 4-month crop planning timeline.\n"
-            "They will provide:\n"
-            "- Crop Type\n"
-            "- Land Size (in acres)\n"
-            "- Budget (in PKR)\n"
-            "- Water Availability (High, Medium, or Low)\n"
-            "- Language (en or ur)\n\n"
-            "Generate a highly structured 4-month timeline tailored exactly to their inputs:\n"
-            "1. Budget Efficiency: Give tips on cost savings for seed and fertilizer based on their land size and PKR budget.\n"
-            "2. Water Optimization: Provide specific irrigation frequencies and conservation schedules matched to their water availability tier.\n"
-            "3. Actionable schedule:\n"
-            "   - Month 1: Soil preparation and seed procurement\n"
-            "   - Month 2: Sowing and early stage weeding/watering\n"
-            "   - Month 3: Fertilizer application (DAP/Urea ratios) and pest monitoring\n"
-            "   - Month 4: Irrigation scheduling and harvesting/yield planning\n\n"
-            "Write the response directly in the requested language (either English or Urdu).\n"
-            "Use clean Markdown formatting with headers (e.g. ### Month 1: Soil Preparation), bullet points, and bold tags. "
-            "Keep the entire plan extremely structured, concise, and under 250 words total. "
-            "Keep it highly encouraging, practical, and optimized for farmers in Pakistan."
+            "You are a senior agronomist in Pakistan. Generate a customized 4-month crop planning timeline.\n"
+            "Format the response directly in the requested language (English or Urdu) using clean markdown (### Month 1...).\n"
+            "Keep the response highly realistic, practical, under 180 words, and optimized for Pakistani conditions.\n"
+            "Structure: Month 1 (Soil), Month 2 (Sowing), Month 3 (Fertilizers/Pests), Month 4 (Irrigation/Harvest)."
         )
         
         user_prompt = (
-            f"Generate a customized 4-month crop plan with these inputs:\n"
-            f"- Crop Type: {crop_type}\n"
-            f"- Land Size: {land_size} acres\n"
-            f"- Total Budget: Rs. {budget}\n"
-            f"- Water Availability: {water_availability}\n"
-            f"- Preferred Language: {lang} (Provide output in Urdu Nastaliq-aligned script if 'ur', otherwise English)"
+            f"Generate 4-month crop plan:\n"
+            f"Crop: {crop_type}, Land: {land_size} acres, Budget: Rs. {budget}, Water: {water_availability}.\n"
+            f"Language: {lang} (Output in Urdu script if 'ur', otherwise English)"
         )
         
         messages = [
@@ -62,7 +46,7 @@ def generate_crop_plan(payload):
         
         # Call Groq AI completions engine
         logger.debug("Dispatching request to Groq client completions...")
-        ai_response = call_groq_completions(messages, max_tokens=400, temperature=0.5)
+        ai_response = call_groq_completions(messages, max_tokens=250, temperature=0.5)
         
         # Fallback offline generator if Groq completions returns empty or fails
         if not ai_response:

@@ -12,6 +12,7 @@ import { mountCalendar } from './pages/calendar.js';
 import { mountCommunity } from './pages/community.js';
 import { mountPlanner } from './pages/planner.js';
 import { mountWholesale } from './pages/wholesale.js';
+import { mountAdmin } from './pages/admin.js';
 import { renderSidebar } from './components/sidebar.js';
 import { openModal } from './components/modal.js';
 import { apiGetScan, apiGetProfile } from './api.js';
@@ -145,6 +146,7 @@ registerRoute('calendar', mountCalendar);
 registerRoute('community', mountCommunity);
 registerRoute('planner', mountPlanner);
 registerRoute('wholesale', mountWholesale);
+registerRoute('admin', mountAdmin);
 
 // Expose modal handler globally for recent scans or history list cards
 window.__openScanModal = async function(id) {

@@ -7,29 +7,18 @@ import time
 
 logger = logging.getLogger(__name__)
 
-wholesale_bp = Blueprint('wholesale', __name__, url_prefix='/api/v1/wholesale')
+from utils.rate_limit import rate_limit
 
-# Rate limit tracking cache
-WHOLESALE_RATE_LIMITS = {}
+wholesale_bp = Blueprint('wholesale', __name__, url_prefix='/api/v1/wholesale')
 
 @wholesale_bp.route('/analyze', methods=['POST'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def analyze_wholesale_deal(payload):
     """Analyze a wholesale crop marketplace listing using Groq AI and suggest negotiation tactics"""
     try:
         user_id = payload['user_id']
-        now = time.time()
-        
-        # Cooldown check
-        if user_id in WHOLESALE_RATE_LIMITS:
-            last_req = WHOLESALE_RATE_LIMITS[user_id]
-            if now - last_req < 10:  # 10 second rate-limit cooldown
-                return jsonify({
-                    'status': 'error',
-                    'message': 'AI Rate Limit: Please wait 10 seconds between wholesale consultations.'
-                }), 429
-                
-        WHOLESALE_RATE_LIMITS[user_id] = now
         
         data = request.get_json() or {}
         item_id = data.get('item_id')
@@ -59,34 +48,20 @@ def analyze_wholesale_deal(payload):
         logger.info(f"Analyzing wholesale deal {item_id} for user {user_id}: {title}, Price: {price}, Location: {location}, Lang: {lang}")
         
         system_prompt = (
-            "You are 'AgroFarm DealMind', an elite B2B agricultural trade advisor and commodity pricing analyst in Pakistan.\n"
-            "Your role is to analyze a crop wholesale listing on behalf of a bulk buyer (like a retailer, vegetable vendor/sabziwala, or restaurant supplier).\n"
-            "You will receive:\n"
-            "- Product Title\n"
-            "- Category\n"
-            "- Listing Price\n"
-            "- Seller Name\n"
-            "- Location\n"
-            "- Description\n"
-            "- Preferred Language (en or ur)\n\n"
-            "Perform a business commodity analysis and return a clean, highly structured Markdown report containing:\n"
-            "1. Price Assessment: Evaluate if the listing price is fair compared to typical wholesale rates in major Pakistani agriculture mandis (like Lahore Badami Bagh Sabzi Mandi or Karachi Mandi).\n"
-            "2. Deal Rating: Assign a visual badge rating: '🔥 Excellent Bargain', '🟢 Fair Price', or '⚠️ Overpriced'. Highlight this badge at the very top of your evaluation.\n"
-            "3. Retail Profit Potential: Estimate standard markups when sold in urban retail markets (like local vegetable vendors, fruit shops, or supermarkets) and how they can manage logistical/freight overhead.\n"
-            "4. AI Negotiation Tactics: Provide 3 strategic, highly respectful, and persuasive bargaining points (in Urdu Noto Nastaliq script if lang is 'ur', otherwise English) that the buyer can use to bargain with the farmer over WhatsApp.\n"
-            "Write the response directly in the requested language (either English or Urdu). "
-            "Use clear Markdown formatting with H3 headers, bold accents, and bullet points. Keep it highly realistic, trade-focused, and under 150 words total (4-5 sentences max)."
+            "You are 'AgroFarm DealMind', an agricultural trade advisor in Pakistan. "
+            "Analyze the wholesale listing on behalf of a bulk buyer.\n"
+            "Return a structured Markdown report under 120 words with:\n"
+            "1. Deal Rating: '🔥 Excellent Bargain', '🟢 Fair Price', or '⚠️ Overpriced' at the top.\n"
+            "2. Price Assessment: Fair rate evaluation compared to major Pakistani mandis.\n"
+            "3. profit Potential: Estimate retail markup potential.\n"
+            "4. AI Negotiation Tactics: 3 short bargaining points.\n"
+            "Output directly in the requested language."
         )
         
         user_prompt = (
-            f"Analyze this wholesale listing:\n"
-            f"- Product Title: {title}\n"
-            f"- Category: {category}\n"
-            f"- Listing Price: {price}\n"
-            f"- Location: {location}\n"
-            f"- Seller Name: {seller_name}\n"
-            f"- Description: {description}\n"
-            f"- Preferred Language: {lang} (Output in Urdu Nastaliq-aligned script if 'ur', otherwise English)"
+            f"Analyze wholesale listing:\n"
+            f"Title: {title}, Category: {category}, Price: {price}, Location: {location}, Details: {description}\n"
+            f"Language: {lang} (Output in Urdu script if 'ur', otherwise English)"
         )
         
         messages = [
@@ -96,7 +71,7 @@ def analyze_wholesale_deal(payload):
         
         # Call Groq AI completions engine
         logger.debug("Dispatching request to Groq client B2B completions...")
-        ai_response = call_groq_completions(messages, max_tokens=350, temperature=0.6)
+        ai_response = call_groq_completions(messages, max_tokens=250, temperature=0.6)
         
         # Fallback offline generator if Groq completions returns empty or fails
         if not ai_response:
@@ -169,26 +144,14 @@ def get_offline_wholesale_fallback(title, category, price, location, description
 from utils.gemini_client import call_gemini
 import json as _json
 
-PRICE_RATE_LIMITS = {}
-
 @wholesale_bp.route('/suggest-price', methods=['POST'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def suggest_price(payload):
     """Use Gemini 2.5 Flash to suggest optimal wholesale pricing for a crop listing."""
     try:
         user_id = payload['user_id']
-        now = time.time()
-
-        # Rate limit cooldown
-        if user_id in PRICE_RATE_LIMITS:
-            last_req = PRICE_RATE_LIMITS[user_id]
-            if now - last_req < 10:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'AI Rate Limit: Please wait 10 seconds between price consultations.'
-                }), 429
-
-        PRICE_RATE_LIMITS[user_id] = now
 
         data = request.get_json() or {}
         crop_type = data.get('crop_type', 'Wheat')
@@ -201,32 +164,24 @@ def suggest_price(payload):
         logger.info(f"AI Price Suggestion for user {user_id}: {crop_type}, {region}, {quantity}, lang={lang}")
 
         system_instruction = (
-            "You are 'AgroPrice AI', an elite Pakistani agricultural commodity pricing expert. "
-            "You have deep knowledge of wholesale mandi rates across Pakistan's major agricultural markets "
-            "(Lahore Badami Bagh, Karachi Super Highway Mandi, Faisalabad Grain Market, Multan Vehari Road Mandi, etc.).\n\n"
-            "Given a crop type, region, quantity, and optional description, provide a pricing recommendation.\n\n"
-            "IMPORTANT: Return ONLY a valid raw JSON object (no markdown, no backticks, no extra text) with these exact keys:\n"
-            "- \"suggested_price\": A string with the recommended price (e.g., 'Rs. 3,200/maund' or 'Rs. 85,000/ton')\n"
-            "- \"price_range_low\": A string with the lower end of fair market range\n"
-            "- \"price_range_high\": A string with the upper end of fair market range\n"
-            "- \"unit\": The pricing unit used (e.g., 'per maund', 'per ton', 'per kg')\n"
-            "- \"confidence\": A string rating: 'High', 'Medium', or 'Low'\n"
-            f"- \"reasoning\": A 2-3 sentence explanation of why this price is recommended, written in {'Urdu (اردو)' if lang == 'ur' else 'English'}\n"
-            f"- \"market_insight\": A 1-2 sentence current market trend insight, written in {'Urdu (اردو)' if lang == 'ur' else 'English'}"
+            "You are 'AgroPrice AI', a Pakistani agricultural pricing expert. "
+            "Return ONLY a raw JSON object (no markdown, no backticks, no extra text) with these exact keys:\n"
+            "- \"suggested_price\": string (e.g., 'Rs. 3,200/maund')\n"
+            "- \"price_range_low\": string (lower range)\n"
+            "- \"price_range_high\": string (upper range)\n"
+            "- \"unit\": string (e.g., 'per maund')\n"
+            "- \"confidence\": 'High', 'Medium', or 'Low'\n"
+            f"- \"reasoning\": A 2-sentence explanation in {'Urdu' if lang == 'ur' else 'English'}\n"
+            f"- \"market_insight\": A 1-sentence market trend in {'Urdu' if lang == 'ur' else 'English'}"
         )
 
         prompt = (
-            f"Suggest the optimal wholesale listing price for:\n"
-            f"- Crop/Product: {crop_type}\n"
-            f"- Category: {category}\n"
-            f"- Region: {region}, Pakistan\n"
-            f"- Quantity: {quantity}\n"
-            f"- Additional Details: {description or 'None provided'}\n"
-            f"- Current Month: June 2025 (Kharif season)\n\n"
-            f"Return ONLY a JSON object with the pricing recommendation."
+            f"Suggest wholesale listing price for:\n"
+            f"Crop: {crop_type}, Category: {category}, Region: {region}, Qty: {quantity}, Details: {description or 'None'}.\n"
+            "Return JSON object."
         )
 
-        gemini_resp = call_gemini(prompt, system_instruction=system_instruction, temperature=0.3, max_tokens=800, json_mode=True)
+        gemini_resp = call_gemini(prompt, system_instruction=system_instruction, temperature=0.3, max_tokens=400, json_mode=True)
 
         parsed = None
         if gemini_resp:

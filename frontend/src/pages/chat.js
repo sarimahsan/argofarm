@@ -74,7 +74,7 @@ export async function mountChat(container) {
               <i class="fas fa-cloud-arrow-up"></i>
               <span class="upload-box-text">Upload</span>
             </div>
-            <input type="text" class="pill-input" id="chatInput" placeholder="Describe your crop issue or ask a question...">
+            <textarea class="pill-input" id="chatInput" placeholder="Describe your crop issue or ask a question..." rows="1" style="resize: none; max-height: 120px; min-height: 38px; height: 38px; line-height: 1.4; padding: 8px 12px; font-family: inherit; box-sizing: border-box; overflow-y: auto;"></textarea>
             <button class="pill-btn mic-btn" id="micBtn" type="button" title="Speak (Urdu/English)" style="margin-right:4px;"><i class="fas fa-microphone"></i></button>
             <button class="pill-btn" id="sendBtn" type="button" title="Send" style="color:var(--accent);"><i class="fas fa-paper-plane"></i></button>
           </div>
@@ -127,9 +127,20 @@ export async function mountChat(container) {
   }
 
   // Send message
+  const chatInputEl = container.querySelector('#chatInput');
   container.querySelector('#sendBtn').addEventListener('click', sendMessage);
-  container.querySelector('#chatInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
+  chatInputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Auto-grow textarea height on typing
+  chatInputEl.addEventListener('input', function() {
+    this.style.height = '38px';
+    const newHeight = Math.min(this.scrollHeight, 120);
+    this.style.height = newHeight + 'px';
   });
 
   // Welcome input
@@ -489,6 +500,7 @@ async function sendMessage() {
 
   addUserMessage(text);
   input.value = '';
+  input.style.height = '38px';
 
   const state = getState();
   if (!state.authToken) {
@@ -1057,6 +1069,7 @@ async function startRecording() {
         const chatInput = chatContainer.querySelector('#chatInput');
         if (chatInput) {
           chatInput.value = response.text;
+          chatInput.dispatchEvent(new Event('input'));
           chatInput.focus();
         }
         showToast(isEn ? 'Transcribed!' : 'ترجمہ مکمل!');
@@ -1065,7 +1078,7 @@ async function startRecording() {
       }
     };
     
-    mediaRecorder.start(250);
+    mediaRecorder.start();
     
     const widgets = chatContainer.querySelector('#chatInputWidgets');
     const overlay = chatContainer.querySelector('#recordingOverlay');

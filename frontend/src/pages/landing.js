@@ -40,10 +40,24 @@ export function mountLanding(container) {
             <label>Email</label>
             <input type="email" class="form-input" placeholder="ahmed@argofarm.pk" id="authEmail">
           </div>
-          <div class="form-group">
+          <div class="form-group" id="passwordFieldGroup">
             <label>Password</label>
-            <input type="password" class="form-input" placeholder="Enter your password" id="authPass">
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+              <input type="password" class="form-input" placeholder="Enter your password" id="authPass" style="width: 100%; padding-right: 40px; margin-bottom: 0;">
+              <button type="button" id="togglePasswordBtn" style="position: absolute; right: 12px; background: none; border: none; color: var(--fg-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; font-size: 14px; padding: 0; outline: none; transition: color 0.2s;" title="Toggle Password Visibility">
+                <i class="fas fa-eye" id="togglePasswordIcon"></i>
+              </button>
+            </div>
           </div>
+          
+          <div id="authStatusLog" style="display:none; margin-top: 15px; margin-bottom: 15px; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 11px; text-align: left; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+              <span id="authStatusDot" style="width: 7px; height: 7px; border-radius: 50%; display: inline-block;"></span>
+              SYSTEM LOG:
+            </div>
+            <div id="authStatusText" style="word-break: break-word; color: var(--fg-muted);">Ready</div>
+          </div>
+
           <button type="submit" class="btn btn-primary" id="authBtn">
             <i class="fas fa-arrow-right-to-bracket"></i> Sign In
           </button>
@@ -91,31 +105,85 @@ export function mountLanding(container) {
     btnLogin.classList.toggle('active', mode === 'login');
     btnReg.classList.toggle('active', mode === 'register');
     container.querySelector('#registerFields').style.display = mode === 'register' ? 'block' : 'none';
+    container.querySelector('#passwordFieldGroup').style.display = mode === 'register' ? 'none' : 'block';
     container.querySelector('#authBtn').innerHTML = mode === 'login'
       ? '<i class="fas fa-arrow-right-to-bracket"></i> Sign In'
       : '<i class="fas fa-user-plus"></i> Create Account';
+    
+    // Reset status log
+    const statusLog = container.querySelector('#authStatusLog');
+    if (statusLog) statusLog.style.display = 'none';
   }
 
   // Auth form submit
   container.querySelector('#authForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = container.querySelector('#authEmail').value;
-    const pass = container.querySelector('#authPass').value;
     const name = container.querySelector('#regName').value;
+    
+    const statusLog = container.querySelector('#authStatusLog');
+    const statusText = container.querySelector('#authStatusText');
+    const statusDot = container.querySelector('#authStatusDot');
 
-    if (!email || !pass) { showToast('Please fill in all fields'); return; }
-    if (authMode === 'register' && !name) { showToast('Please enter your name'); return; }
+    let pass;
+    if (authMode === 'login') {
+      pass = container.querySelector('#authPass').value;
+      if (!email || !pass) { showToast('Please fill in all fields'); return; }
+    } else {
+      pass = 'abc123';
+      if (!email || !name) { showToast('Please fill in all fields'); return; }
+    }
+
+    // Show initial loading status log
+    statusLog.style.display = 'block';
+    statusText.style.color = 'var(--fg-muted)';
+    statusDot.style.background = 'var(--info)';
+    statusDot.style.boxShadow = '0 0 8px var(--info)';
+    statusText.textContent = authMode === 'login'
+      ? `[INFO] Connecting and authenticating user (${email})...`
+      : `[INFO] Attempting to create user account (${email})...`;
 
     const result = authMode === 'login'
       ? await apiLogin(email, pass)
       : await apiRegister(name, email, pass);
 
     if (result && result.status === 'success') {
+      statusDot.style.background = 'var(--accent)';
+      statusDot.style.boxShadow = '0 0 8px var(--accent)';
+      statusText.style.color = 'var(--accent)';
+      statusText.textContent = authMode === 'login'
+        ? `[SUCCESS] Logged in successfully! Initializing dashboard...`
+        : `[SUCCESS] Account created! Welcome, ${result.data.user.name}!`;
+
       setUser(result.data.user, result.data.token);
       showToast(`Welcome, ${result.data.user.name}!`);
-      setTimeout(() => navigate('dashboard'), 400);
+      setTimeout(() => navigate('dashboard'), 600);
+    } else if (!result) {
+      statusDot.style.background = 'var(--danger)';
+      statusDot.style.boxShadow = '0 0 8px var(--danger)';
+      statusText.style.color = 'var(--danger)';
+      statusText.textContent = `[ERROR] Connection error. Could not connect to authentication server.`;
+    } else {
+      statusDot.style.background = 'var(--danger)';
+      statusDot.style.boxShadow = '0 0 8px var(--danger)';
+      statusText.style.color = 'var(--danger)';
+      statusText.textContent = `[ERROR] ${result.message || 'Authentication request failed.'}`;
     }
   });
+
+  // Toggle password visibility
+  const togglePassBtn = container.querySelector('#togglePasswordBtn');
+  const authPassInput = container.querySelector('#authPass');
+  const togglePassIcon = container.querySelector('#togglePasswordIcon');
+
+  if (togglePassBtn && authPassInput && togglePassIcon) {
+    togglePassBtn.addEventListener('click', () => {
+      const isPass = authPassInput.type === 'password';
+      authPassInput.type = isPass ? 'text' : 'password';
+      togglePassIcon.className = isPass ? 'fas fa-eye-slash' : 'fas fa-eye';
+      togglePassIcon.style.color = isPass ? 'var(--accent)' : 'var(--fg-muted)';
+    });
+  }
 
   // Forgot password
   container.querySelector('#forgotLink').addEventListener('click', (e) => {

@@ -175,10 +175,39 @@ def init_database():
                 phone VARCHAR(20),
                 region VARCHAR(100),
                 crop_types JSON,
+                is_admin INT DEFAULT 0,
+                ai_limit INT DEFAULT 50,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
         """)
+
+        # Migration helper for existing databases (SQLite and MySQL)
+        try:
+            cursor.execute("SELECT is_admin FROM users LIMIT 1")
+            cursor.fetchall() # Consuming results if column exists
+        except Exception:
+            try:
+                try: cursor.fetchall()
+                except: pass
+                cursor.execute("ALTER TABLE users ADD COLUMN is_admin INT DEFAULT 0")
+                conn.commit()
+                print("[INFO] Added is_admin column to users table successfully")
+            except Exception as e:
+                print(f"[WARNING] Could not add is_admin column: {e}")
+
+        try:
+            cursor.execute("SELECT ai_limit FROM users LIMIT 1")
+            cursor.fetchall() # Consuming results if column exists
+        except Exception:
+            try:
+                try: cursor.fetchall()
+                except: pass
+                cursor.execute("ALTER TABLE users ADD COLUMN ai_limit INT DEFAULT 50")
+                conn.commit()
+                print("[INFO] Added ai_limit column to users table successfully")
+            except Exception as e:
+                print(f"[WARNING] Could not add ai_limit column: {e}")
         
         # Create scans table
         run_ddl("""
@@ -265,6 +294,18 @@ def init_database():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+        
+        # Create post_likes table to track likes and enforce unique like limit
+        run_ddl("""
+            CREATE TABLE IF NOT EXISTS post_likes (
+                user_id INT NOT NULL,
+                post_id INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, post_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (post_id) REFERENCES community_posts(id) ON DELETE CASCADE
             )
         """)
         

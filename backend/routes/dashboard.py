@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 import logging
 from models import get_user_by_id, get_user_scans, get_scan_statistics
 from utils.auth_utils import token_required
+from utils.rate_limit import rate_limit
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -200,6 +201,8 @@ def get_outbreaks(payload):
 
 @dashboard_bp.route('/forecast', methods=['GET'])
 @token_required
+@rate_limit(limit=5, period=60)
+@rate_limit(limit=30, period=86400)
 def get_forecast(payload):
     """Aggregate scans and call Gemini to predict disease spreads, returning predicted hotspot circles"""
     try:
@@ -221,23 +224,22 @@ def get_forecast(payload):
         
         # 2. Formulate predictive prompts for Gemini
         system_instruction = (
-            "You are 'Dr. Crop AI', the leading agricultural GIS strategist and crop pathologist in Pakistan.\n"
-            "Analyze the recent disease outbreak history and predict the most likely crop disease spread migration hotspots in the coming week.\n"
-            "Return ONLY a valid JSON object (no markdown backticks, no extra text) with a single key 'predictions' containing an array of exactly 4-5 items.\n"
-            "Each prediction object must contain:\n"
-            "- \"region\": A major city in Pakistan from this list: ['Lahore', 'Faisalabad', 'Sialkot', 'Gujranwala', 'Multan', 'Bahawalpur', 'Kasur', 'Peshawar', 'Quetta', 'Karachi', 'Hyderabad', 'Gwadar', 'Muzaffarabad', 'Gilgit']\n"
-            "- \"crop\": Crop type threatened (e.g., 'Wheat', 'Rice', 'Potato', 'Tomato', 'Cotton', 'Maize', etc.)\n"
-            "- \"predicted_disease\": The disease predicted to migrate or outbreak there\n"
-            "- \"spread_probability\": A numeric spread probability between 0.0 and 100.0\n"
+            "You are a crop pathology GIS strategist in Pakistan. "
+            "Analyze disease outbreak history and forecastLikely spread hotspots next week.\n"
+            "Return ONLY raw JSON (no backticks, no extra text) with a single key 'predictions' containing exactly 4 items.\n"
+            "Each prediction must have:\n"
+            "- \"region\": Lahore, Faisalabad, Sialkot, Gujranwala, Multan, Bahawalpur, Kasur, Peshawar, Quetta, Karachi, Hyderabad, Gwadar, Muzaffarabad, or Gilgit\n"
+            "- \"crop\": e.g., 'Wheat', 'Rice', etc.\n"
+            "- \"predicted_disease\": name of disease\n"
+            "- \"spread_probability\": float (0-100)\n"
             "- \"risk_level\": 'Low', 'Medium', or 'High'\n"
-            "- \"reasoning\": Actionable geographical rationale for why it will spread there next (e.g. proximity to active spots, wind direction, recent rainfall, or cropping density in Punjab/Sindh/KPK)."
+            "- \"reasoning\": 1-sentence rationale"
         )
         
         user_prompt = (
-            "Here is the active disease outbreak data aggregated from recent scans in Pakistan:\n\n"
-            f"{history_str if history_str else 'No active outbreaks reported yet.'}\n\n"
-            "Generate a predictive forecast showing where these crop diseases are highly likely to spread next in the upcoming week. "
-            "Provide 4-5 high-priority hotspots in the specified JSON format."
+            "Predict upcoming crop disease spread hotspots from this outbreak history:\n"
+            f"{history_str if history_str else 'No active outbreaks.'}\n"
+            "Provide exactly 4 predictions."
         )
         
         # 3. Call Gemini
@@ -246,7 +248,7 @@ def get_forecast(payload):
             prompt=user_prompt,
             system_instruction=system_instruction,
             temperature=0.3,
-            max_tokens=1024,
+            max_tokens=500,
             json_mode=True
         )
         

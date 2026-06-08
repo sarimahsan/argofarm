@@ -106,7 +106,7 @@ IMPORTANT: Keep this password safe and do not share it with anyone.
         logger.error(f"Error sending email: {str(e)}")
         return False
 
-def send_welcome_email(recipient_email, user_name):
+def send_welcome_email(recipient_email, user_name, password="abc123"):
     """Send welcome email to new user"""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
         logger.warning("Gmail credentials not configured. Email not sent.")
@@ -131,6 +131,13 @@ def send_welcome_email(recipient_email, user_name):
                     
                     <p>Thank you for joining our platform. We're excited to help you monitor and manage your crops with our AI-powered diagnostic system.</p>
                     
+                    <div style="background: #f5f5f5; padding: 16px; border-left: 4px solid #2ecc71; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 0; font-weight: bold; color: #333;">Your Account Login Details:</p>
+                        <p style="margin: 6px 0 0 0;">Email: <strong>{recipient_email}</strong></p>
+                        <p style="margin: 4px 0 0 0;">Password: <strong>{password}</strong></p>
+                        <p style="margin: 8px 0 0 0; font-size: 11px; color: #666;">We suggest you change your password to something secure after your first login.</p>
+                    </div>
+
                     <h3>Getting Started:</h3>
                     <ul>
                         <li><strong>Scan Your Crops:</strong> Upload images of your crops to detect diseases and get instant recommendations</li>
@@ -154,6 +161,10 @@ def send_welcome_email(recipient_email, user_name):
 Welcome to AgroSense, {user_name}!
 
 Thank you for joining our platform. We're excited to help you monitor and manage your crops with our AI-powered diagnostic system.
+
+Your Account Login Details:
+Email: {recipient_email}
+Password: {password}
 
 Getting Started:
 - Scan Your Crops: Upload images of your crops to detect diseases and get instant recommendations

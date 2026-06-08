@@ -115,13 +115,13 @@ export async function mountDashboard(container) {
   };
 }
 
-async function loadWeatherWidget(main, region, isUr) {
+async function loadWeatherWidget(main, region, isUr, forceRefresh = false) {
   const wEl = main.querySelector('#weatherWidget');
   if (!wEl) return;
 
   try {
     const lang = isUr ? 'ur' : 'en';
-    const result = await apiGetWeatherAdvisory(lang);
+    const result = await apiGetWeatherAdvisory(lang, forceRefresh);
 
     if (!result || result.status !== 'success' || !result.data) {
       wEl.innerHTML = `<div style="text-align:center;padding:16px;color:var(--fg-muted);font-size:13px;"><i class="fas fa-cloud-sun" style="margin-right:6px;"></i> Weather data unavailable</div>`;
@@ -229,7 +229,7 @@ async function loadWeatherWidget(main, region, isUr) {
       const icon = wEl.querySelector('#refreshWeatherBtn i');
       icon.classList.add('fa-spin');
       showToast(isUr ? 'موسم کی تازہ ترین معلومات حاصل کی جا رہی ہیں...' : 'Refreshing live weather data...');
-      loadWeatherWidget(main, region, isUr).then(() => {
+      loadWeatherWidget(main, region, isUr, true).then(() => {
         const newIcon = wEl.querySelector('#refreshWeatherBtn i');
         if (newIcon) newIcon.classList.remove('fa-spin');
       });

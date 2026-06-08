@@ -8,18 +8,34 @@ import json
 
 def create_user(name, email, password, phone=None, region=None, crop_types=None):
     """Create a new user"""
+    normalized_email = email.strip().lower() if email else ""
     crop_types_json = json.dumps(crop_types or [])
+    
+    # Auto-bootstrap: Make first user or any email starting with admin@ an administrator
+    is_first = True
+    try:
+        res = execute_query("SELECT COUNT(*) as count FROM users")
+        if res and res[0]['count'] > 0:
+            is_first = False
+    except Exception:
+        pass
+        
+    is_admin = 1 if (is_first or normalized_email.startswith('admin@')) else 0
+    
     query = """
-        INSERT INTO users (name, email, password, phone, region, crop_types)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO users (name, email, password, phone, region, crop_types, is_admin)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
-    user_id = execute_insert(query, (name, email, password, phone, region, crop_types_json))
+    user_id = execute_insert(query, (name, normalized_email, password, phone, region, crop_types_json, is_admin))
     return user_id
 
 def get_user_by_email(email):
     """Get user by email"""
+    if not email:
+        return None
+    normalized_email = email.strip().lower()
     query = "SELECT * FROM users WHERE email = %s"
-    result = execute_query(query, (email,))
+    result = execute_query(query, (normalized_email,))
     return result[0] if result else None
 
 def get_user_by_id(user_id):
@@ -243,16 +259,28 @@ def create_community_post(user_id, title, content, category='General'):
     """
     return execute_insert(query, (user_id, title, content, category))
 
-def get_community_posts():
-    """Get all community posts with author details and comment counts"""
-    query = """
-        SELECT p.*, u.name as author_name,
-               (SELECT COUNT(*) FROM community_comments WHERE post_id = p.id) as comment_count
-        FROM community_posts p
-        JOIN users u ON p.user_id = u.id
-        ORDER BY p.created_at DESC
-    """
-    return execute_query(query)
+def get_community_posts(current_user_id=None):
+    """Get all community posts with author details, comment counts, and whether current user liked it"""
+    if current_user_id:
+        query = """
+            SELECT p.*, u.name as author_name,
+                   (SELECT COUNT(*) FROM community_comments WHERE post_id = p.id) as comment_count,
+                   EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = %s) as liked_by_user
+            FROM community_posts p
+            JOIN users u ON p.user_id = u.id
+            ORDER BY p.created_at DESC
+        """
+        return execute_query(query, (current_user_id,))
+    else:
+        query = """
+            SELECT p.*, u.name as author_name,
+                   (SELECT COUNT(*) FROM community_comments WHERE post_id = p.id) as comment_count,
+                   0 as liked_by_user
+            FROM community_posts p
+            JOIN users u ON p.user_id = u.id
+            ORDER BY p.created_at DESC
+        """
+        return execute_query(query)
 
 def get_community_post_by_id(post_id):
     """Get a specific community post"""
@@ -260,10 +288,35 @@ def get_community_post_by_id(post_id):
     res = execute_query(query, (post_id,))
     return res[0] if res else None
 
-def like_community_post(post_id):
-    """Increment the like count for a community post"""
-    query = "UPDATE community_posts SET likes_count = likes_count + 1 WHERE id = %s"
-    return execute_update(query, (post_id,))
+def like_community_post(post_id, user_id):
+    """Toggle the like status for a community post by a user"""
+    check_query = "SELECT 1 FROM post_likes WHERE user_id = %s AND post_id = %s"
+    already_liked = execute_query(check_query, (user_id, post_id))
+    
+    if already_liked:
+        # Unlike: Delete like record
+        delete_query = "DELETE FROM post_likes WHERE user_id = %s AND post_id = %s"
+        execute_update(delete_query, (user_id, post_id))
+        
+        # Decrement count
+        update_query = "UPDATE community_posts SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END WHERE id = %s"
+        execute_update(update_query, (post_id,))
+        action = "unliked"
+    else:
+        # Like: Insert like record
+        insert_query = "INSERT INTO post_likes (user_id, post_id) VALUES (%s, %s)"
+        execute_insert(insert_query, (user_id, post_id))
+        
+        # Increment count
+        update_query = "UPDATE community_posts SET likes_count = likes_count + 1 WHERE id = %s"
+        execute_update(update_query, (post_id,))
+        action = "liked"
+        
+    # Get new count
+    count_query = "SELECT likes_count FROM community_posts WHERE id = %s"
+    res = execute_query(count_query, (post_id,))
+    new_count = res[0]['likes_count'] if res else 0
+    return action, new_count
 
 def create_community_comment(post_id, user_id, content):
     """Create a new comment on a post"""
