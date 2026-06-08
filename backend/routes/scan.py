@@ -111,14 +111,18 @@ def predict(payload):
         )
 
         logger.info("Dispatching image to Gemini Vision API (gemini-2.5-flash)...")
-        gemini_resp = call_gemini_vision(
-            prompt=user_prompt,
-            base64_image=base64_image,
-            system_instruction=system_prompt,
-            temperature=0.15,
-            max_tokens=1024,
-            json_mode=True
-        )
+        gemini_resp = None
+        try:
+            gemini_resp = call_gemini_vision(
+                prompt=user_prompt,
+                base64_image=base64_image,
+                system_instruction=system_prompt,
+                temperature=0.15,
+                max_tokens=1024,
+                json_mode=True
+            )
+        except Exception as gem_ex:
+            logger.error(f"Error calling call_gemini_vision: {gem_ex}")
 
         parsed = None
         if gemini_resp:
@@ -126,113 +130,188 @@ def predict(payload):
                 from utils.gemini_client import extract_json_from_text
                 clean_resp = extract_json_from_text(gemini_resp)
                 parsed = json.loads(clean_resp)
-                detected_crop = parsed.get("crop_type", crop_type)
-                
-                # Update crop_type if it was Unknown or not provided
-                if crop_type == 'Unknown' or not crop_type:
-                    if detected_crop and detected_crop.lower() != 'unknown':
-                        crop_type = detected_crop
-
-                disease = parsed.get("disease", "Unknown")
-                confidence = float(parsed.get("confidence", 85.0))
-                status = parsed.get("status", "Diseased")
-                advisory_text = parsed.get("advisory", "Pathology detected. Consult expert.")
-                
-                # Check for low confidence or non-plant image rejection
-                if confidence < 50.0 or status.lower() == 'invalid' or 'invalid' in disease.lower() or 'clear' in advisory_text.lower() or 'پودے' in advisory_text:
-                    logger.warning(f"Scan validation rejected with low confidence={confidence}%, status={status}")
-                    error_msg = "Please upload a clear picture or a picture of a plant."
-                    if lang == 'ur':
-                        error_msg = "براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔"
-                    
-                    if chat_session_id:
-                        create_chat_message(
-                            user_id=user_id,
-                            chat_session_id=chat_session_id,
-                            title="Invalid Scan",
-                            message=f'/static/uploads/{filename}',
-                            sender='user',
-                            message_type='image',
-                            language=lang
-                        )
-                        create_chat_message(
-                            user_id=user_id,
-                            chat_session_id=chat_session_id,
-                            title="Invalid Scan",
-                            message=error_msg,
-                            sender='bot',
-                            message_type='text',
-                            language=lang
-                        )
-                    
-                    return jsonify({
-                        'status': 'success',
-                        'data': {
-                            'scan_id': None,
-                            'disease': 'Unclear Image' if lang == 'en' else 'غیر واضح تصویر',
-                            'confidence': round(confidence, 2),
-                            'status': 'Invalid',
-                            'advisory': error_msg,
-                            'assistant_message': error_msg,
-                            'image_url': f'/static/uploads/{filename}',
-                            'crop_type': 'Unknown'
-                        }
-                    }), 200
-
-                # Normal valid result parsing
-                if lang == 'ur':
-                    advisory_en = "No English advisory details available."
-                    advisory_ur = advisory_text
-                else:
-                    advisory_en = advisory_text
-                    advisory_ur = "کوئی اردو مشورہ دستیاب نہیں ہے۔"
-                
-                logger.info(f"✅ Gemini Vision successfully classified: {disease} for crop: {crop_type} ({confidence}%)")
+                logger.info("✅ Gemini Vision response received and parsed successfully")
             except Exception as parse_error:
                 logger.error(f"Failed to parse JSON from Gemini Vision: {parse_error}. Raw response: {gemini_resp}")
                 parsed = None
+
+        # Fallback to Groq Vision if Gemini failed or didn't return parseable JSON
+        if not parsed:
+            logger.warning("⚠️ Gemini Vision failed or JSON parse failed. Falling back to Groq Vision API...")
+            groq_resp = None
+            try:
+                from utils.groq_client import call_groq_vision
+                groq_resp = call_groq_vision(
+                    prompt=user_prompt,
+                    base64_image=base64_image,
+                    system_instruction=system_prompt,
+                    temperature=0.15,
+                    max_tokens=1024,
+                    json_mode=True
+                )
+            except Exception as groq_ex:
+                logger.error(f"❌ Error calling call_groq_vision fallback: {groq_ex}")
+
+            if groq_resp:
+                try:
+                    from utils.gemini_client import extract_json_from_text
+                    clean_resp = extract_json_from_text(groq_resp)
+                    parsed = json.loads(clean_resp)
+                    logger.info("✅ Groq Vision fallback response received and parsed successfully")
+                except Exception as parse_error:
+                    logger.error(f"Failed to parse JSON from Groq Vision: {parse_error}. Raw response: {groq_resp}")
+                    parsed = None
+                    
+                    # Check raw Groq response for invalid/non-plant/blurry indicators
+                    resp_lower = groq_resp.lower()
+                    if any(kw in resp_lower for kw in ["no plant", "invalid image", "no leaf", "blurry", "unclear", "not a plant", "not plant"]):
+                        logger.warning("Recommending rejection based on raw Groq response keywords after JSON parse failure.")
+                        error_msg = "Please upload a clear picture or a picture of a plant."
+                        if lang == 'ur':
+                            error_msg = "براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔"
+                        
+                        if chat_session_id:
+                            create_chat_message(
+                                user_id=user_id,
+                                chat_session_id=chat_session_id,
+                                title="Invalid Scan",
+                                message=f'/static/uploads/{filename}',
+                                sender='user',
+                                message_type='image',
+                                language=lang
+                            )
+                            create_chat_message(
+                                user_id=user_id,
+                                chat_session_id=chat_session_id,
+                                title="Invalid Scan",
+                                message=error_msg,
+                                sender='bot',
+                                message_type='text',
+                                language=lang
+                            )
+                        
+                        return jsonify({
+                            'status': 'success',
+                            'data': {
+                                'scan_id': None,
+                                'disease': 'Unclear Image' if lang == 'en' else 'غیر واضح تصویر',
+                                'confidence': 10.0,
+                                'status': 'Invalid',
+                                'advisory': error_msg,
+                                'assistant_message': error_msg,
+                                'image_url': f'/static/uploads/{filename}',
+                                'crop_type': 'Unknown'
+                            }
+                        }), 200
+            else:
+                # If both failed, check raw Gemini response for rejection before resorting to offline fallback
+                if gemini_resp:
+                    resp_lower = gemini_resp.lower()
+                    if any(kw in resp_lower for kw in ["no plant", "invalid image", "no leaf", "blurry", "unclear", "not a plant", "not plant"]):
+                        logger.warning("Recommending rejection based on raw Gemini response keywords after both parsed and Groq failed.")
+                        error_msg = "Please upload a clear picture or a picture of a plant."
+                        if lang == 'ur':
+                            error_msg = "براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔"
+                        
+                        if chat_session_id:
+                            create_chat_message(
+                                user_id=user_id,
+                                chat_session_id=chat_session_id,
+                                title="Invalid Scan",
+                                message=f'/static/uploads/{filename}',
+                                sender='user',
+                                message_type='image',
+                                language=lang
+                            )
+                            create_chat_message(
+                                user_id=user_id,
+                                chat_session_id=chat_session_id,
+                                title="Invalid Scan",
+                                message=error_msg,
+                                sender='bot',
+                                message_type='text',
+                                language=lang
+                            )
+                        
+                        return jsonify({
+                            'status': 'success',
+                            'data': {
+                                'scan_id': None,
+                                'disease': 'Unclear Image' if lang == 'en' else 'غیر واضح تصویر',
+                                'confidence': 10.0,
+                                'status': 'Invalid',
+                                'advisory': error_msg,
+                                'assistant_message': error_msg,
+                                'image_url': f'/static/uploads/{filename}',
+                                'crop_type': 'Unknown'
+                            }
+                        }), 200
+
+        if parsed:
+            detected_crop = parsed.get("crop_type", crop_type)
+            
+            # Update crop_type if it was Unknown or not provided
+            if crop_type == 'Unknown' or not crop_type:
+                if detected_crop and detected_crop.lower() != 'unknown':
+                    crop_type = detected_crop
+
+            disease = parsed.get("disease", "Unknown")
+            confidence = float(parsed.get("confidence", 85.0))
+            status = parsed.get("status", "Diseased")
+            advisory_text = parsed.get("advisory", "Pathology detected. Consult expert.")
+            
+            # Check for low confidence or non-plant image rejection
+            if confidence < 50.0 or status.lower() == 'invalid' or 'invalid' in disease.lower() or 'clear' in advisory_text.lower() or 'پودے' in advisory_text:
+                logger.warning(f"Scan validation rejected with low confidence={confidence}%, status={status}")
+                error_msg = "Please upload a clear picture or a picture of a plant."
+                if lang == 'ur':
+                    error_msg = "براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔"
                 
-                # Check raw response for invalid/non-plant/blurry indicators
-                resp_lower = gemini_resp.lower() if gemini_resp else ""
-                if any(kw in resp_lower for kw in ["no plant", "invalid image", "no leaf", "blurry", "unclear", "not a plant", "not plant"]):
-                    logger.warning("Recommending rejection based on raw response keywords after JSON parse failure.")
-                    error_msg = "Please upload a clear picture or a picture of a plant."
-                    if lang == 'ur':
-                        error_msg = "براہ کرم پودے کی یا کوئی واضح تصویر اپ لوڈ کریں۔"
-                    
-                    if chat_session_id:
-                        create_chat_message(
-                            user_id=user_id,
-                            chat_session_id=chat_session_id,
-                            title="Invalid Scan",
-                            message=f'/static/uploads/{filename}',
-                            sender='user',
-                            message_type='image',
-                            language=lang
-                        )
-                        create_chat_message(
-                            user_id=user_id,
-                            chat_session_id=chat_session_id,
-                            title="Invalid Scan",
-                            message=error_msg,
-                            sender='bot',
-                            message_type='text',
-                            language=lang
-                        )
-                    
-                    return jsonify({
-                        'status': 'success',
-                        'data': {
-                            'scan_id': None,
-                            'disease': 'Unclear Image' if lang == 'en' else 'غیر واضح تصویر',
-                            'confidence': 10.0,
-                            'status': 'Invalid',
-                            'advisory': error_msg,
-                            'assistant_message': error_msg,
-                            'image_url': f'/static/uploads/{filename}',
-                            'crop_type': 'Unknown'
-                        }
-                    }), 200
+                if chat_session_id:
+                    create_chat_message(
+                        user_id=user_id,
+                        chat_session_id=chat_session_id,
+                        title="Invalid Scan",
+                        message=f'/static/uploads/{filename}',
+                        sender='user',
+                        message_type='image',
+                        language=lang
+                    )
+                    create_chat_message(
+                        user_id=user_id,
+                        chat_session_id=chat_session_id,
+                        title="Invalid Scan",
+                        message=error_msg,
+                        sender='bot',
+                        message_type='text',
+                        language=lang
+                    )
+                
+                return jsonify({
+                    'status': 'success',
+                    'data': {
+                        'scan_id': None,
+                        'disease': 'Unclear Image' if lang == 'en' else 'غیر واضح تصویر',
+                        'confidence': round(confidence, 2),
+                        'status': 'Invalid',
+                        'advisory': error_msg,
+                        'assistant_message': error_msg,
+                        'image_url': f'/static/uploads/{filename}',
+                        'crop_type': 'Unknown'
+                    }
+                }), 200
+
+            # Normal valid result parsing
+            if lang == 'ur':
+                advisory_en = "No English advisory details available."
+                advisory_ur = advisory_text
+            else:
+                advisory_en = advisory_text
+                advisory_ur = "کوئی اردو مشورہ دستیاب نہیں ہے۔"
+                
+            logger.info(f"✅ AI Vision successfully classified: {disease} for crop: {crop_type} ({confidence}%)")
+
+
 
         # Robust agronomist diagnostic fallback if Gemini Vision fails
         if not parsed:
