@@ -220,7 +220,7 @@
 
 <!-- ==================== COVER PAGE ==================== -->
 <div class="cover">
-  <div class="cover-icon">🌾</div>
+  <div class="cover-icon" style="font-size: 32px; font-weight: 800; letter-spacing: 2px; color: var(--primary-dark); margin-bottom: 20px;">ARGOFARM</div>
   <h1>ArgoFarm</h1>
   <p class="subtitle">
     AI-Powered Crop Diagnostics &amp; Advisory Platform for Pakistan<br>
@@ -229,7 +229,7 @@
   <div class="cover-meta">
     <strong>Platform:</strong> Web Application (SPA)<br>
     <strong>Domain:</strong> Agricultural Technology (AgriTech) / Artificial Intelligence<br>
-    <strong>Target Region:</strong> Pakistan 🇵🇰<br>
+    <strong>Target Region:</strong> Pakistan<br>
     <strong>Languages Supported:</strong> English &amp; Urdu (اردو)<br>
     <strong>Report Date:</strong> June 2026<br>
   </div>
@@ -242,7 +242,7 @@
 <h1>Table of Contents</h1>
 <div class="toc">
 <ol>
-  <li><a href="#overview">Project Overview</a></li>
+  <li><a href="#overview">Project Overview &amp; Impact</a></li>
   <li><a href="#techstack">Technology Stack</a></li>
   <li><a href="#architecture">System Architecture</a></li>
   <li><a href="#features">Features &amp; Modules</a></li>
@@ -259,40 +259,47 @@
 <div class="page-break"></div>
 
 <!-- ==================== 1. PROJECT OVERVIEW ==================== -->
-<h1 id="overview">1. Project Overview</h1>
+<h1 id="overview">1. Project Overview &amp; Impact</h1>
 
 <p>
-  <strong>ArgoFarm</strong> is an AI-powered agricultural advisory and crop disease diagnostics platform 
-  designed specifically for farmers in Pakistan. The platform integrates multiple artificial intelligence 
-  models — including Google Gemini 2.5 Flash Vision for image-based disease detection, Groq LLaMA 3.3 
-  for conversational advisory, and a custom-trained Random Forest model for soil-based crop 
-  recommendations — to provide a comprehensive decision-support system.
+  <strong>ArgoFarm</strong> is an agricultural support platform designed to assist farmers in Pakistan. 
+  By combining modern web technologies with user-friendly artificial intelligence, the platform helps 
+  farmers identify plant health issues, get general cultivation advice, consult local weather alerts, and 
+  view marketplace pricing trends. The system aims to bridge the gap between complex technological tools 
+  and the everyday needs of rural farming communities.
 </p>
 
 <p>
-  The application is a full-stack web platform with a Flask-based RESTful backend, a Vanilla JavaScript 
-  single-page application (SPA) frontend built with Vite, and a MySQL/SQLite database layer. It supports 
-  bilingual (English/Urdu) interaction across all modules and is designed to be mobile-responsive for 
-  field usage by farmers.
+  The system is built as a complete web application containing a Flask API backend, a Vanilla JavaScript 
+  single-page frontend, and a relational database. It offers dual-language support in English and Urdu, 
+  and is designed to display cleanly on mobile devices so farmers can use it directly in their fields.
+</p>
+
+<h2>1.1 User Impact and General Usability</h2>
+<p>
+  ArgoFarm is designed for everyone involved in local farming, from individual smallholders to agricultural 
+  cooperative leaders. The platform simplifies complex data so users do not need a background in technology 
+  to benefit from it. By allowing farmers to upload simple photos of crop leaves or speak their queries aloud 
+  in Urdu or English, the system provides accessible, conversational guidance. This helps farmers make quick 
+  decisions about soil nutrients, crop diseases, and crop timing to protect their harvest and improve their income.
 </p>
 
 <h2>Problem Statement</h2>
 <p>
-  Pakistani farmers face significant crop losses due to late or incorrect disease identification, 
-  lack of access to expert agronomists, unreliable weather-based decision making, and absence of 
-  transparent wholesale market pricing. ArgoFarm addresses these challenges by providing instant 
-  AI-powered diagnostics, real-time weather advisories, community-driven knowledge sharing, and 
-  AI-assisted wholesale market analysis — all accessible through a single web interface.
+  Farmers often lose crops because they cannot identify plant diseases early or get advice from agricultural 
+  experts in time. Volatile weather conditions and a lack of transparent wholesale market prices also make it 
+  difficult for farmers to plan their activities and negotiate fair deals. ArgoFarm provides a simple, centralized 
+  tool to address these everyday challenges by bringing diagnostics, alerts, and market guidance together.
 </p>
 
 <h2>Key Objectives</h2>
 <ul>
-  <li>Provide instant, AI-powered crop disease detection from leaf images with actionable treatment advisories</li>
-  <li>Enable voice-enabled conversational farming advisory in English and Urdu</li>
-  <li>Deliver real-time weather forecasts with AI-generated crop protection guidance</li>
-  <li>Facilitate a community forum where farmers share knowledge and get AI-powered diagnosis on their posts</li>
-  <li>Support wholesale marketplace price analysis and negotiation tactics using AI</li>
-  <li>Provide soil-parameter-based crop recommendations using trained ML models</li>
+  <li>Provide crop disease diagnostics from simple leaf photos with straightforward remedies</li>
+  <li>Allow voice questions in local languages for easy, hands-free interactions</li>
+  <li>Deliver basic weather forecasts paired with practical guidance to protect crops from rain or heat</li>
+  <li>Provide a community board for farmers to share knowledge and discuss common agricultural issues</li>
+  <li>Supply simple wholesale marketplace pricing guides and negotiation strategies</li>
+  <li>Offer crop recommendations based on basic soil parameters</li>
 </ul>
 
 <div class="page-break"></div>

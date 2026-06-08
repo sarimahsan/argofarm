@@ -95,7 +95,7 @@ Thumbs.db
 
 # Machine Learning Models (if > 100MB)
 *.h5
-*.pkl
+# *.pkl
 *.joblib
 *.model
 

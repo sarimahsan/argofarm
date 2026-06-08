@@ -195,12 +195,9 @@ if __name__ == '__main__':
     
     print("Server Started!")
     
-    # Note: debug=False disables the reloader which prevents Flask from
-    # restarting when TensorFlow/scikit-learn files change.
-    # Set FLASK_ENV=development to enable debug mode for development.
     app.run(
         host='0.0.0.0',
         port=5000,
-        debug=False,  # Disabled to prevent auto-reload spam from TensorFlow
-        use_reloader=False  # Disable file watcher to prevent restart loops
+        debug=False,  
+        use_reloader=False  
     )

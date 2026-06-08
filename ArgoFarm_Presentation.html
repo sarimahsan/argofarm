@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArgoFarm — AI-Powered Crop Diagnostics & Advisory Platform (Presentation)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --primary: #2ecc71;
+    --primary-dark: #27ae60;
+    --accent: #f1c40f;
+    --danger: #e74c3c;
+    --info: #3498db;
+    --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    --bg-card: rgba(30, 41, 59, 0.7);
+    --border: rgba(255, 255, 255, 0.08);
+    --fg: #f8fafc;
+    --fg-muted: #94a3b8;
+    --code-bg: #0f172a;
+    --slide-w: 100vw;
+    --slide-h: 100vh;
+    --radius-lg: 16px;
+    --radius-md: 8px;
+    --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  [data-theme="light"] {
+    --primary: #16a34a;
+    --primary-dark: #15803d;
+    --accent: #d97706;
+    --danger: #dc2626;
+    --info: #2563eb;
+    --bg-gradient: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0f9ff 100%);
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --border: rgba(0, 0, 0, 0.08);
+    --fg: #0f172a;
+    --fg-muted: #475569;
+    --code-bg: #f1f5f9;
+    --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-gradient);
+    color: var(--fg);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    transition: background 0.5s ease, color 0.5s ease;
+  }
+
+  /* Presentation Container */
+  .presentation {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Slides Wrapper */
+  .slides-container {
+    flex: 1;
+    display: flex;
+    transition: transform 0.6s cubic-bezier(0.645, 0.045, 0.355, 1);
+    height: 100%;
+  }
+
+  /* Slide Style */
+  .slide {
+    min-width: 100vw;
+    width: 100vw;
+    height: 100%;
+    padding: 60px 80px 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow-y: auto;
+  }
+
+  /* Slide Content Box (Glassmorphic Card) */
+  .slide-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 40px 50px;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    min-height: 70vh;
+    justify-content: space-between;
+    transition: border-color 0.3s ease, background 0.3s ease;
+  }
+
+  .slide-header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .slide-title {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    letter-spacing: -0.5px;
+  }
+
+  .slide-title i {
+    font-size: 28px;
+  }
+
+  .slide-number {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg-muted);
+    background: var(--border);
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+
+  .slide-body {
+    flex: 1;
+    font-size: 18px;
+    line-height: 1.6;
+  }
+
+  /* Typography */
+  h3 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 20px 0 10px;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  p {
+    margin-bottom: 16px;
+    color: var(--fg);
+  }
+
+  ul, ol {
+    margin-left: 25px;
+    margin-bottom: 20px;
+  }
+
+  li {
+    margin-bottom: 10px;
+    color: var(--fg);
+  }
+
+  strong {
+    color: var(--primary);
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-primary { background: rgba(46, 204, 113, 0.15); color: var(--primary); border: 1px solid rgba(46, 204, 113, 0.25); }
+  .badge-accent { background: rgba(241, 196, 15, 0.15); color: var(--accent); border: 1px solid rgba(241, 196, 15, 0.25); }
+  .badge-info { background: rgba(52, 152, 219, 0.15); color: var(--info); border: 1px solid rgba(52, 152, 219, 0.25); }
+  .badge-danger { background: rgba(231, 76, 60, 0.15); color: var(--danger); border: 1px solid rgba(231, 76, 60, 0.25); }
+
+  /* Columns Grid */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 15px;
+  }
+
+  th, td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  th {
+    background: rgba(46, 204, 113, 0.08);
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.01);
+  }
+
+  /* Code Block */
+  pre {
+    background: var(--code-bg);
+    padding: 15px 20px;
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    margin: 10px 0;
+    color: #e2e8f0;
+  }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+
+  pre code {
+    color: inherit;
+    background: none;
+    padding: 0;
+    font-size: 13px;
+  }
+
+  /* Cover Slide Layout */
+  .slide-cover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 100%;
+    padding: 40px;
+  }
+
+  .cover-box {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 60px 50px;
+    max-width: 900px;
+    box-shadow: var(--shadow);
+    border-top: 5px solid var(--primary);
+  }
+
+  .cover-logo {
+    font-size: 72px;
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+  }
+
+  .cover-box h1 {
+    font-size: 54px;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 10px;
+    letter-spacing: -1.5px;
+  }
+
+  .cover-box h2 {
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--fg-muted);
+    margin-bottom: 30px;
+    line-height: 1.5;
+  }
+
+  .cover-meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    border-top: 1px solid var(--border);
+    padding-top: 25px;
+    font-size: 14px;
+    color: var(--fg-muted);
+    text-align: left;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .cover-meta div span {
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  /* Architecture diagram */
+  .arch-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 20px auto;
+    max-width: 900px;
+  }
+
+  .arch-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .arch-box {
+    padding: 12px 20px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    text-align: center;
+    font-size: 14px;
+    border: 1px solid transparent;
+    flex: 1;
+    max-width: 250px;
+  }
+
+  .arch-frontend { background: rgba(52, 152, 219, 0.12); color: #3498db; border-color: rgba(52, 152, 219, 0.25); }
+  .arch-proxy { background: rgba(155, 89, 182, 0.12); color: #9b59b6; border-color: rgba(155, 89, 182, 0.25); }
+  .arch-backend { background: rgba(46, 204, 113, 0.12); color: #2ecc71; border-color: rgba(46, 204, 113, 0.25); }
+  .arch-db { background: rgba(231, 76, 60, 0.12); color: #e74c3c; border-color: rgba(231, 76, 60, 0.25); }
+  .arch-ai { background: rgba(241, 196, 15, 0.12); color: #f1c40f; border-color: rgba(241, 196, 15, 0.25); }
+
+  .arch-arrow-v {
+    color: var(--fg-muted);
+    font-size: 16px;
+    margin: 2px 0;
+  }
+
+  /* Control Panel Bottom */
+  .controls {
+    position: fixed;
+    bottom: 25px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 41, 59, 0.9);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px 24px;
+    border-radius: 40px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    z-index: 100;
+  }
+
+  .control-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 18px;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .control-btn:hover {
+    color: var(--primary);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .control-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .progress-container {
+    width: 150px;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--primary);
+    transition: width 0.3s ease;
+  }
+
+  .slide-indicator {
+    font-size: 14px;
+    font-weight: 600;
+    color: #94a3b8;
+    min-width: 45px;
+    text-align: center;
+  }
+
+  /* Sidebar jump menu */
+  .sidebar-trigger {
+    position: fixed;
+    top: 25px;
+    right: 25px;
+    z-index: 100;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    right: -320px;
+    width: 320px;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(16px);
+    border-left: 1px solid var(--border);
+    padding: 30px 20px;
+    z-index: 200;
+    transition: right 0.3s ease;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar.open {
+    right: 0;
+  }
+
+  .sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+
+  .sidebar-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--primary);
+  }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+  }
+
+  .sidebar-item {
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 14px;
+    color: #94a3b8;
+    transition: all 0.2s ease;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-item:hover, .sidebar-item.active {
+    color: #fff;
+    background: rgba(46, 204, 113, 0.15);
+  }
+
+  /* Toggle Theme Switch */
+  .theme-toggle-btn {
+    position: fixed;
+    top: 25px;
+    left: 25px;
+    z-index: 100;
+  }
+
+  /* Info Cards */
+  .info-card {
+    background: rgba(46, 204, 113, 0.05);
+    border-left: 4px solid var(--primary);
+    padding: 15px 20px;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    margin-bottom: 15px;
+  }
+  .info-card h4 {
+    margin-bottom: 6px;
+    color: var(--primary);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .info-card-danger {
+    background: rgba(231, 76, 60, 0.05);
+    border-left: 4px solid var(--danger);
+  }
+  .info-card-danger h4 {
+    color: var(--danger);
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  /* Printing */
+  @media print {
+    body {
+      overflow: visible;
+      height: auto;
+      width: auto;
+      background: #fff !important;
+      color: #000 !important;
+    }
+    .presentation {
+      display: block;
+    }
+    .slides-container {
+      display: block;
+      transform: none !important;
+    }
+    .slide {
+      page-break-after: always;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      background: none;
+    }
+    .slide-card {
+      border: none;
+      box-shadow: none;
+      background: #fff;
+      color: #000;
+      min-height: auto;
+      padding: 20px;
+    }
+    .controls, .sidebar, .sidebar-trigger, .theme-toggle-btn {
+      display: none !important;
+    }
+  }
+
+  /* Responsive styling */
+  @media (max-width: 768px) {
+    .slide {
+      padding: 20px 20px 80px;
+    }
+    .slide-card {
+      padding: 20px;
+      min-height: 80vh;
+    }
+    .slide-title {
+      font-size: 22px;
+    }
+    .grid-2 {
+      grid-template-columns: 1fr;
+      gap: 15px;
+    }
+    .controls {
+      width: 90%;
+      justify-content: space-between;
+      padding: 8px 16px;
+    }
+    .progress-container {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="presentation">
+  <div class="slides-container" id="slidesContainer">
+
+    <!-- SLIDE 1: Cover -->
+    <div class="slide">
+      <div class="slide-cover">
+        <div class="cover-box">
+          <div class="cover-logo" style="font-size: 32px; font-weight: 800; letter-spacing: 2px; color: var(--primary-dark); margin-bottom: 20px;">ARGOFARM</div>
+          <h1>ArgoFarm</h1>
+          <h2>Agricultural Advisory &amp; Crop Diagnostics Platform for Pakistan</h2>
+          <div class="badge badge-primary" style="margin-bottom: 25px; font-size:14px; padding: 6px 16px;">Technical Presentation</div>
+          
+          <div class="cover-meta">
+            <div><i class="fas fa-desktop"></i> Platform: <span>Web Application SPA</span></div>
+            <div><i class="fas fa-globe"></i> Languages: <span>English &amp; Urdu</span></div>
+            <div><i class="fas fa-bullseye"></i> Goal: <span>Decision Support for Farmers</span></div>
+            <div><i class="fas fa-calendar-alt"></i> Date: <span>June 2026</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: Project Overview & Impact -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-info-circle"></i> 1. Project Overview &amp; Impact</div>
+          <div class="slide-number">Slide 2 / 12</div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div>
+              <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> The Challenge</h3>
+              <p>Many farmers in Pakistan face crop losses due to common difficulties:</p>
+              <ul>
+                <li><strong>Late Diagnosis:</strong> Crop diseases are often not identified in time, leading to lower yields.</li>
+                <li><strong>Lack of Experts:</strong> Rural areas lack quick access to trained agricultural advisors.</li>
+                <li><strong>Weather Changes:</strong> Changing weather makes it hard to manage watering and planting schedules.</li>
+                <li><strong>Market Gaps:</strong> Difficulty accessing transparent wholesale prices for fair crop sales.</li>
+              </ul>
+            </div>
+            <div>
+              <h3><i class="fas fa-lightbulb" style="color:var(--accent)"></i> The Solution</h3>
+              <p><strong>ArgoFarm</strong> provides an easy-to-use digital portal to support everyday farming:</p>
+              <ul>
+                <li><strong>Leaf Scanning:</strong> Identify crop health issues by uploading simple leaf photos.</li>
+                <li><strong>Voice Assistance:</strong> Ask questions naturally in English or Urdu.</li>
+                <li><strong>Crop Calendars:</strong> Get simple planning guides based on land size and budget.</li>
+                <li><strong>Outbreak Radar:</strong> View general crop health trends and warnings by region.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: Technology Stack -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-layer-group"></i> 2. Technology Stack</div>
+          <div class="slide-number">Slide 3 / 12</div>
+        </div>
+        <div class="slide-body" style="font-size: 16px;">
+          <div class="grid-2">
+            <div>
+              <h4 style="font-weight:700; color:var(--primary); margin-bottom:8px;"><i class="fab fa-python"></i> Backend &amp; Database</h4>
+              <ul>
+                <li><strong>Flask:</strong> Manages web requests and coordinates backend modules.</li>
+                <li><strong>MySQL &amp; SQLite:</strong> Relational data storage with automatic system fallbacks.</li>
+                <li><strong>Security tools:</strong> Hashed passwords and secure session logins protect user accounts.</li>
+                <li><strong>Local Classifier:</strong> Local model for soil-based crop recommendations.</li>
+              </ul>
+            </div>
+            <div>
+              <h4 style="font-weight:700; color:var(--primary); margin-bottom:8px;"><i class="fab fa-js"></i> Frontend &amp; UI</h4>
+              <ul>
+                <li><strong>Vanilla JS:</strong> Clean frontend logic for a fast user experience.</li>
+                <li><strong>Mobile Design:</strong> Optimized layouts for field usage on mobile screens.</li>
+                <li><strong>Interactive Maps:</strong> Displays general regional health summaries.</li>
+                <li><strong>Simple Charts:</strong> Renders visual statistics for crop history logs.</li>
+              </ul>
+            </div>
+          </div>
+          
+          <h4 style="font-weight:700; color:var(--primary); margin:12px 0 8px;"><i class="fas fa-robot"></i> AI Integrations</h4>
+          <div class="grid-3" style="font-size:14px;">
+            <div class="info-card">
+              <h4>Google Gemini</h4>
+              <p style="font-size:13px; margin:0;">Vision scanning, Weather advisory, Hotspot forecasting, Price assessment.</p>
+            </div>
+            <div class="info-card">
+              <h4>Groq LLaMA</h4>
+              <p style="font-size:13px; margin:0;">CropMind Chat advisor, AI Planner, Deal analysis, AI Calendar advisor.</p>
+            </div>
+            <div class="info-card">
+              <h4>Groq Whisper</h4>
+              <p style="font-size:13px; margin:0;">Automatic transcription for localized voice input queries.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: How the Platform Works -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-sitemap"></i> 3. How the Platform Works</div>
+          <div class="slide-number">Slide 4 / 12</div>
+        </div>
+        <div class="slide-body">
+          <p style="text-align: center; margin-bottom: 15px;">Simple system architecture designed for easy access and stability:</p>
+          
+          <div class="arch-container">
+            <div class="arch-row">
+              <div class="arch-box arch-frontend"><i class="fas fa-desktop"></i> User Interface<br><span style="font-size:11px; font-weight:normal;">Mobile Web SPA / Charts / Maps</span></div>
+            </div>
+            <div class="arch-arrow-v"><i class="fas fa-arrow-down"></i> <i class="fas fa-arrow-up"></i> (Secure API Requests)</div>
+            <div class="arch-row">
+              <div class="arch-box arch-proxy"><i class="fas fa-network-wired"></i> Web Proxy Gateway<br><span style="font-size:11px; font-weight:normal;">Nginx Reverse Proxy routing</span></div>
+            </div>
+            <div class="arch-arrow-v"><i class="fas fa-arrow-down"></i> <i class="fas fa-arrow-up"></i></div>
+            <div class="arch-row">
+              <div class="arch-box arch-backend"><i class="fab fa-python"></i> Application Server<br><span style="font-size:11px; font-weight:normal;">Flask Core Logic Controller</span></div>
+            </div>
+            <div class="arch-arrow-v"><i class="fas fa-arrow-down"></i> <i class="fas fa-arrow-up"></i></div>
+            <div class="arch-row" style="gap: 15px;">
+              <div class="arch-box arch-db" style="max-width:200px;"><i class="fas fa-database"></i> Database<br><span style="font-size:11px; font-weight:normal;">MySQL / SQLite</span></div>
+              <div class="arch-box arch-ai" style="max-width:200px;"><i class="fas fa-robot"></i> Cloud AI services<br><span style="font-size:11px; font-weight:normal;">Gemini &amp; Groq APIs</span></div>
+              <div class="arch-box arch-ai" style="max-width:200px;"><i class="fas fa-brain"></i> Local Classifier<br><span style="font-size:11px; font-weight:normal;">RF Crop Model</span></div>
+            </div>
+          </div>
+          
+          <div class="info-card" style="margin-top: 15px; font-size:14px; padding: 10px 15px;">
+            <p style="margin:0;"><strong>Data Flow:</strong> Secure login grants session credentials &rarr; Server processes inputs &rarr; System coordinates database records and cloud diagnostics &rarr; Built-in fallbacks ensure platform remains usable when APIs are offline.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: Core Tools: Diagnostics & Chat -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-star"></i> 4. Diagnostics &amp; Chat Advisor</div>
+          <div class="slide-number">Slide 5 / 12</div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div>
+              <h3><i class="fas fa-qrcode"></i> AI Crop Disease Scan</h3>
+              <ul>
+                <li><strong>Photo Upload:</strong> Farmers capture leaf photos to request health diagnostics.</li>
+                <li><strong>Treatment Advisory:</strong> Delivers instant advice on organic cures, pesticide remedies, and preventions.</li>
+                <li><strong>Dual Language:</strong> Instantly translates guides into clear English or Urdu.</li>
+                <li><strong>Input Guard:</strong> Identifies and rejects blurry or non-crop photos, prompting users to try again.</li>
+              </ul>
+            </div>
+            <div>
+              <h3><i class="fas fa-comments"></i> CropMind AI Chat</h3>
+              <ul>
+                <li><strong>Digital Advisor:</strong> Acts as a local agronomist, ignoring off-topic user messages.</li>
+                <li><strong>Voice Assistance:</strong> Farmers record audio questions directly through the portal for ease of use.</li>
+                <li><strong>Auto-Routing:</strong> Mentions of soil checks or disease scans automatically open the correct form.</li>
+                <li><strong>Lightweight Context:</strong> Keeps track of recent conversation exchanges for continuity.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: Soil Reports & Marketplace -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-seedling"></i> 5. Soil Suggestions, Planner &amp; Market</div>
+          <div class="slide-number">Slide 6 / 12</div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-3" style="font-size: 15px;">
+            <div class="info-card">
+              <h4>Soil Recommendations</h4>
+              <p>Analyzes nitrogen, phosphorus, potassium, and climate inputs through a local model to recommend the best crop, followed by LLaMA-generated farming guides.</p>
+            </div>
+            <div class="info-card">
+              <h4>AI Crop Planner</h4>
+              <p>Generates simple 4-month timelines based on budget, acreage, and water availability in English and Urdu to guide farmers from sowing to harvest.</p>
+            </div>
+            <div class="info-card">
+              <h4>Marketplace Analysis</h4>
+              <p>Includes a notice board for wholesale listings. AI analyzes listing prices, checks mandi averages, and suggests pricing and negotiation ideas.</p>
+            </div>
+          </div>
+          
+          <h3>Outbreak Radar &amp; Weather Warnings</h3>
+          <p style="font-size: 16px;">
+            Crop disease cases are displayed on a regional map. AI helps forecast spread risk levels (low, medium, high) in neighboring areas. 
+            Weather advisories are paired with basic action plans to help farmers protect their crops.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: Database Design -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-database"></i> 6. Database and Storage</div>
+          <div class="slide-number">Slide 7 / 12</div>
+        </div>
+        <div class="slide-body">
+          <p style="font-size: 15px; margin-bottom: 10px;">
+            Structured relational design supports transparent system fallbacks. MySQL 8.0 operates in production, while lightweight SQLite serves local developer sandboxes.
+          </p>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th>Primary Fields</th>
+                <th>Relationship &amp; Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>users</strong></td>
+                <td>id, email, password_hash, region, is_admin, ai_limit</td>
+                <td>Stores user profiles, roles, and custom daily AI limits</td>
+              </tr>
+              <tr>
+                <td><strong>scans</strong></td>
+                <td>id, user_id, crop_type, disease, confidence, image_url</td>
+                <td>Saves upload history, leaf diagnostic reports, and advice</td>
+              </tr>
+              <tr>
+                <td><strong>chat_history</strong></td>
+                <td>id, user_id, chat_session_id, message, sender</td>
+                <td>Preserves advisor chats to keep logical conversation context</td>
+              </tr>
+              <tr>
+                <td><strong>post_likes</strong></td>
+                <td>user_id, post_id</td>
+                <td>Tracks forum post likes to ensure single-vote rules</td>
+              </tr>
+              <tr>
+                <td><strong>community_posts</strong></td>
+                <td>id, user_id, title, content, likes_count</td>
+                <td>Manages farmer discussions, Q&amp;A, and comments</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: API Rate Limiting -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-shield-alt"></i> 7. Rate Limiting &amp; Stability</div>
+          <div class="slide-number">Slide 8 / 12</div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div>
+              <h3><i class="fas fa-lock"></i> Cooldown Controls</h3>
+              <p style="font-size: 15px;">
+                Implemented on critical server routes to protect resources. 
+                Saves request counts dynamically by user account or IP address, returning structured warnings when limits are reached.
+              </p>
+              <pre style="font-size: 11px; padding: 10px;"><code># Cooldown decorator example
+@scan_bp.route('/predict', methods=['POST'])
+@token_required
+@rate_limit(limit=3, period=60)
+@rate_limit(limit=10, period=86400)
+def predict(payload):
+    # Route logic</code></pre>
+            </div>
+            <div>
+              <h3><i class="fas fa-tasks"></i> Default Usage Quotas</h3>
+              <table style="font-size: 13px; margin: 0;">
+                <thead>
+                  <tr><th>Service</th><th>Route Cooldown</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><code>Leaf scanning</code></td><td>3 requests per minute, 10 per day</td></tr>
+                  <tr><td><code>CropMind advisor</code></td><td>10 requests per minute, 100 per day</td></tr>
+                  <tr><td><code>Voice transcription</code></td><td>5 requests per minute, 50 per day</td></tr>
+                  <tr><td><code>Weather warnings</code></td><td>5 requests per minute, 30 per day</td></tr>
+                  <tr><td><code>Crop planning</code></td><td>5 requests per minute, 30 per day</td></tr>
+                  <tr><td><code>Community diagnostics</code></td><td>5 requests per minute, 30 per day</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: Admin Management Console -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-user-shield"></i> 8. Admin Controls &amp; Governance</div>
+          <div class="slide-number">Slide 9 / 12</div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div>
+              <h3><i class="fas fa-users-cog"></i> User Management</h3>
+              <ul>
+                <li><strong>Admin Panel:</strong> Restricted console allowing administrators to search and manage user registration records.</li>
+                <li><strong>Auto-Bootstrap:</strong> Grants admin status to the first user or email starting with admin@ automatically.</li>
+                <li><strong>Account Controls:</strong> Modify privileges, adjust roles, or delete inactive user records.</li>
+              </ul>
+            </div>
+            <div>
+              <h3><i class="fas fa-sliders-h"></i> Custom Quota Settings</h3>
+              <ul>
+                <li><strong>AI Limit Controls:</strong> Adjust daily AI request limits for individual accounts to manage server resource allocation.</li>
+                <li><strong>AI Access Block:</strong> Setting limits to zero completely disables AI tools for selected accounts.</li>
+                <li><strong>Lockout Safeguard:</strong> Prevents active admins from deleting their own accounts or demoting themselves.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="info-card" style="margin-top: 15px; font-size:14px; padding: 10px 15px;">
+            <p style="margin:0;"><strong>Note:</strong> Safe admin validations ensure the running session administrator cannot accidentally trigger demotions on themselves, preventing system lockouts.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 10: Security & Compliance -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-key"></i> 9. Platform Security Measures</div>
+          <div class="slide-number">Slide 10 / 12</div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div>
+              <h3><i class="fas fa-user-check"></i> Account Safeguards</h3>
+              <ul>
+                <li><strong>Secure Hashing:</strong> Bcrypt password hashing prevents storing user passwords in plaintext.</li>
+                <li><strong>Token Sessions:</strong> Signed Web Tokens handle secure authentication across browser sessions.</li>
+                <li><strong>Session Expiry:</strong> Automatic logout clears cached tokens if session expires.</li>
+              </ul>
+            </div>
+            <div>
+              <h3><i class="fas fa-server"></i> API and Database Integrity</h3>
+              <ul>
+                <li><strong>Query Parameterization:</strong> Eliminates SQL injection threats across database connections.</li>
+                <li><strong>Email Sanitization:</strong> Normalizes inputs to prevent duplicate registrations.</li>
+                <li><strong>Environment Isolation:</strong> Sensitive credentials and API keys are stored in secure environment files.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 11: Deployment & DevOps -->
+    <div class="slide">
+      <div class="slide-card">
+        <div class="slide-header">
+          <div class="slide-title"><i class="fas fa-server"></i> 10. Deployment &amp; Infrastructure</div>
+          <div class="slide-number">Slide 11 / 12</div>
+        </div>
+        <div class="slide-body">
+          <div class="grid-2">
+            <div>
+              <h3><i class="fab fa-docker"></i> Containerized Stack</h3>
+              <p style="font-size: 15px;">Docker Compose maps and deploys four isolated services:</p>
+              <ul>
+                <li><strong>Database service:</strong> MySQL database container with health checks and volumes.</li>
+                <li><strong>Backend application:</strong> Flask server container running core routes.</li>
+                <li><strong>Proxy router:</strong> Nginx gateway managing SSL and request directions.</li>
+              </ul>
+            </div>
+            <div>
+              <h3><i class="fas fa-cloud-upload-alt"></i> Static Web Hosting</h3>
+              <ul>
+                <li><strong>Frontend CDN:</strong> Hosted on a global network (Netlify) for fast load times.</li>
+                <li><strong>Proxy Rules:</strong> Redirects backend queries smoothly to bypass browser security issues.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 12: Thank you -->
+    <div class="slide">
+      <div class="slide-cover">
+        <div class="cover-box">
+          <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px; color: var(--primary-dark); margin-bottom: 20px;">ARGOFARM</div>
+          <h1>Thank You</h1>
+          <h2>ArgoFarm — Agricultural Advisory &amp; Crop Diagnostics Platform</h2>
+          <p style="font-size: 16px; color: var(--fg-muted); margin-bottom: 30px;">Supporting Pakistani farmers through simple and accessible technology</p>
+          
+          <div class="badge badge-primary" style="font-size: 13px; padding: 8px 20px;">Questions &amp; Answers</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CONTROL PANEL BOTTOM -->
+  <div class="controls">
+    <button class="control-btn" id="prevBtn" title="Previous Slide (Left Arrow)"><i class="fas fa-chevron-left"></i></button>
+    <button class="control-btn" id="playBtn" title="Auto Play Slideshow"><i class="fas fa-play"></i></button>
+    
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    
+    <div class="slide-indicator" id="slideIndicator">1 / 12</div>
+    
+    <button class="control-btn" id="nextBtn" title="Next Slide (Right Arrow, Space)"><i class="fas fa-chevron-right"></i></button>
+  </div>
+
+  <!-- THEME TOGGLE -->
+  <button class="control-btn theme-toggle-btn" id="themeToggleBtn" title="Toggle Light/Dark Theme">
+    <i class="fas fa-sun"></i>
+  </button>
+
+  <!-- SIDEBAR TRIGGER -->
+  <button class="control-btn sidebar-trigger" id="sidebarTrigger" title="Outline Index Menu">
+    <i class="fas fa-list-ul"></i>
+  </button>
+
+  <!-- SIDEBAR MENU -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h3>Presentation Outline</h3>
+      <button class="control-btn" id="sidebarCloseBtn"><i class="fas fa-times"></i></button>
+    </div>
+    <ul class="sidebar-list" id="sidebarList">
+      <!-- Items populated dynamically -->
+    </ul>
+  </div>
+</div>
+
+<script>
+  // Presentation Script State
+  let currentSlide = 0;
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  const slidesContainer = document.getElementById('slidesContainer');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const playBtn = document.getElementById('playBtn');
+  const slideIndicator = document.getElementById('slideIndicator');
+  const progressBar = document.getElementById('progressBar');
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const sidebarTrigger = document.getElementById('sidebarTrigger');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+  const sidebarList = document.getElementById('sidebarList');
+  
+  let slideshowInterval = null;
+  let isPlaying = false;
+
+  // Initialize Outline Menu
+  const slideTitles = [
+    "Cover / Title",
+    "1. Project Overview",
+    "2. Technology Stack",
+    "3. System Architecture",
+    "4. Core Features",
+    "5. Dynamic Advisories",
+    "6. Database Design",
+    "7. API Rate Limiting",
+    "8. Admin Console",
+    "9. Platform Security",
+    "10. Deployment Architecture",
+    "End / Q&A"
+  ];
+
+  slideTitles.forEach((title, index) => {
+    const li = document.createElement('li');
+    li.className = `sidebar-item ${index === 0 ? 'active' : ''}`;
+    li.textContent = `${index + 1}. ${title}`;
+    li.addEventListener('click', () => {
+      goToSlide(index);
+      closeSidebar();
+    });
+    sidebarList.appendChild(li);
+  });
+
+  // Navigate function
+  function updateSlides() {
+    slidesContainer.style.transform = `translateX(-${currentSlide * 100}vw)`;
+    
+    // Update buttons
+    prevBtn.disabled = currentSlide === 0;
+    nextBtn.disabled = currentSlide === totalSlides - 1;
+    
+    // Update indicator
+    slideIndicator.textContent = `${currentSlide + 1} / ${totalSlides}`;
+    
+    // Update progress bar
+    const progress = ((currentSlide + 1) / totalSlides) * 100;
+    progressBar.style.width = `${progress}%`;
+
+    // Update active sidebar items
+    const sidebarItems = document.querySelectorAll('.sidebar-item');
+    sidebarItems.forEach((item, index) => {
+      if (index === currentSlide) {
+        item.classList.add('active');
+        item.scrollIntoView({ block: 'nearest' });
+      } else {
+        item.classList.remove('active');
+      }
+    });
+  }
+
+  function goToSlide(index) {
+    if (index >= 0 && index < totalSlides) {
+      currentSlide = index;
+      updateSlides();
+    }
+  }
+
+  function nextSlide() {
+    if (currentSlide < totalSlides - 1) {
+      currentSlide++;
+      updateSlides();
+    } else if (isPlaying) {
+      // Loop slideshow
+      currentSlide = 0;
+      updateSlides();
+    }
+  }
+
+  function prevSlide() {
+    if (currentSlide > 0) {
+      currentSlide--;
+      updateSlides();
+    }
+  }
+
+  // Event Listeners
+  prevBtn.addEventListener('click', () => {
+    stopSlideshow();
+    prevSlide();
+  });
+
+  nextBtn.addEventListener('click', () => {
+    stopSlideshow();
+    nextSlide();
+  });
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault();
+      stopSlideshow();
+      nextSlide();
+    } else if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp') {
+      e.preventDefault();
+      stopSlideshow();
+      prevSlide();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      stopSlideshow();
+      goToSlide(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      stopSlideshow();
+      goToSlide(totalSlides - 1);
+    }
+  });
+
+  // Play/Pause Slideshow
+  function startSlideshow() {
+    isPlaying = true;
+    playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    playBtn.title = "Pause Slideshow";
+    slideshowInterval = setInterval(nextSlide, 5000); // 5 seconds interval
+  }
+
+  function stopSlideshow() {
+    isPlaying = false;
+    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    playBtn.title = "Auto Play Slideshow";
+    if (slideshowInterval) {
+      clearInterval(slideshowInterval);
+      slideshowInterval = null;
+    }
+  }
+
+  playBtn.addEventListener('click', () => {
+    if (isPlaying) {
+      stopSlideshow();
+    } else {
+      startSlideshow();
+    }
+  });
+
+  // Theme Toggle (Light/Dark)
+  themeToggleBtn.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    
+    // Update theme icon
+    const themeIcon = themeToggleBtn.querySelector('i');
+    if (newTheme === 'light') {
+      themeIcon.className = 'fas fa-moon';
+      themeToggleBtn.title = 'Switch to Dark Mode';
+    } else {
+      themeIcon.className = 'fas fa-sun';
+      themeToggleBtn.title = 'Switch to Light Mode';
+    }
+  });
+
+  // Sidebar Menu Actions
+  function openSidebar() {
+    sidebar.classList.add('open');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+  }
+
+  sidebarTrigger.addEventListener('click', openSidebar);
+  sidebarCloseBtn.addEventListener('click', closeSidebar);
+
+  // Close sidebar on click outside
+  document.addEventListener('click', (e) => {
+    if (!sidebar.contains(e.target) && !sidebarTrigger.contains(e.target)) {
+      closeSidebar();
+    }
+  });
+
+  // Swipe support for touch screens
+  let startX = 0;
+  document.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+  });
+
+  document.addEventListener('touchend', (e) => {
+    const diff = e.changedTouches[0].clientX - startX;
+    if (Math.abs(diff) > 80) { // Threshold
+      if (diff > 0) {
+        prevSlide();
+      } else {
+        nextSlide();
+      }
+      stopSlideshow();
+    }
+  });
+
+  // Initialize
+  updateSlides();
+</script>
+</body>
+</html>
