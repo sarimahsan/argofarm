@@ -60,7 +60,7 @@ def call_gemini(prompt, system_instruction=None, temperature=0.7, max_tokens=409
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         try:
             logger.info(f"Calling Gemini API (model={model}, temp={temperature}, max_tokens={max_tokens})")
-            response = requests.post(url, headers=headers, json=payload, timeout=45)
+            response = requests.post(url, headers=headers, json=payload, timeout=15)
 
             if response.ok:
                 data = response.json()
@@ -74,6 +74,9 @@ def call_gemini(prompt, system_instruction=None, temperature=0.7, max_tokens=409
                 logger.warning(f"Gemini API (model={model}) returned no candidates: {data}")
             else:
                 logger.warning(f"⚠️ Gemini API Error for model={model}: Status {response.status_code} - {response.text[:200]}")
+                if response.status_code in [400, 401, 403]:
+                    logger.error("❌ Critical authentication or bad request error (400/401/403). Stopping fallback attempts.")
+                    break
         except Exception as e:
             logger.error(f"❌ Exception calling Gemini API with model={model}: {e}")
 
@@ -146,7 +149,7 @@ def call_gemini_vision(prompt, base64_image, mime_type="image/jpeg", system_inst
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         try:
             logger.info(f"Calling Gemini Vision API (model={model}, temp={temperature}, max_tokens={max_tokens})")
-            response = requests.post(url, headers=headers, json=payload, timeout=45)
+            response = requests.post(url, headers=headers, json=payload, timeout=15)
 
             if response.ok:
                 data = response.json()
@@ -160,6 +163,9 @@ def call_gemini_vision(prompt, base64_image, mime_type="image/jpeg", system_inst
                 logger.warning(f"Gemini Vision API (model={model}) returned no candidates: {data}")
             else:
                 logger.warning(f"⚠️ Gemini Vision API Error for model={model}: Status {response.status_code} - {response.text[:200]}")
+                if response.status_code in [400, 401, 403]:
+                    logger.error("❌ Critical authentication or bad request error (400/401/403). Stopping fallback attempts.")
+                    break
         except Exception as e:
             logger.error(f"❌ Exception calling Gemini Vision API with model={model}: {e}")
 

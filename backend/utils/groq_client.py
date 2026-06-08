@@ -167,7 +167,7 @@ def call_groq_vision(prompt, base64_image, mime_type="image/jpeg", system_instru
         
     try:
         logger.info(f"Calling Groq Vision API (model={model}, temp={temperature}, max_tokens={max_tokens})")
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
         if response.ok:
             data = response.json()
             if 'choices' in data and len(data['choices']) > 0:
