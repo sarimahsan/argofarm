@@ -282,7 +282,7 @@ window.__openScanModal = async function(id) {
             ${imgUrl ? `
             <div style="width:240px; text-align:center;">
               <img src="${imgUrl}" style="width:100%; height:160px; border-radius:8px; border:1.5px solid #e5e7eb; object-fit:cover; display:block;" />
-              <div style="font-size:9px; color:#9ca3af; margin-top:6px; font-style:italic; font-weight:500;">Submitted leaf sample scan</div>
+              <div style="font-size:9px; color:#9ca3af; margin-top:6px; font-style:italic; font-weight:500;">Submitted crop sample scan</div>
             </div>
             ` : ''}
           </div>

@@ -105,7 +105,7 @@ def call_gemini_vision(prompt, base64_image, mime_type="image/jpeg", system_inst
         logger.warning("⚠️ GEMINI_API_KEY is not set. Please add it to your .env file.")
         return None
 
-    primary_model = os.getenv('GEMINI_VISION_MODEL') or os.getenv('GEMINI_MODEL', 'gemini-3.5-flash')
+    primary_model = os.getenv('GEMINI_VISION_MODEL') or 'gemini-3.5-flash'
     # Build fallback vision model chain (preferring gemini-3.5-flash then falling back to gemini-2.5-flash)
     models_to_try = [primary_model]
     for fallback in ['gemini-3.5-flash', 'gemini-2.5-flash']:
@@ -158,13 +158,22 @@ def call_gemini_vision(prompt, base64_image, mime_type="image/jpeg", system_inst
                     parts = candidates[0].get("content", {}).get("parts", [])
                     if parts:
                         text = parts[0].get("text", "")
-                        logger.info(f"✅ Gemini Vision response received via model={model} ({len(text)} chars)")
-                        return text
+                        if json_mode:
+                            try:
+                                clean_text = extract_json_from_text(text)
+                                json.loads(clean_text)
+                                logger.info(f"✅ Gemini Vision response received and validated as JSON via model={model}")
+                                return text
+                            except Exception as json_err:
+                                logger.warning(f"⚠️ Model {model} returned invalid JSON: {json_err}. Trying fallback model...")
+                        else:
+                            logger.info(f"✅ Gemini Vision response received via model={model} ({len(text)} chars)")
+                            return text
                 logger.warning(f"Gemini Vision API (model={model}) returned no candidates: {data}")
             else:
                 logger.warning(f"⚠️ Gemini Vision API Error for model={model}: Status {response.status_code} - {response.text[:200]}")
-                if response.status_code in [400, 401, 403]:
-                    logger.error("❌ Critical authentication or bad request error (400/401/403). Stopping fallback attempts.")
+                if response.status_code == 401:
+                    logger.error("❌ Critical authentication error (401). Stopping fallback attempts.")
                     break
         except Exception as e:
             logger.error(f"❌ Exception calling Gemini Vision API with model={model}: {e}")

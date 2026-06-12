@@ -267,9 +267,9 @@ def forgot_password():
         user = get_user_by_email(email_normalized)
         if not user:
             return jsonify({
-                'status': 'success',
-                'message': 'If email exists, password has been reset and sent'
-            }), 200
+                'status': 'error',
+                'message': 'Email is not registered'
+            }), 404
         
         # Set password to 1234
         temp_password = '1234'

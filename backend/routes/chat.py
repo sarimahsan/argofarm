@@ -141,7 +141,7 @@ def send_message(payload):
         
         # Overwrite response direction if a trigger was detected to guide the user naturally
         if action_trigger == 'trigger_image_upload':
-            system_prompt += " Instruct the farmer to upload a clear photo of the leaves/stem using the file uploader."
+            system_prompt += " Instruct the farmer to upload a clear photo of the affected crop part (leaf, flower, fruit, stem, root, or whole plant) using the file uploader."
         elif action_trigger == 'trigger_soil_inputs':
             system_prompt += " Guide the farmer to input their soil chemistry parameters in the form that has appeared."
 
@@ -164,9 +164,9 @@ def send_message(payload):
             current_app.logger.warning("Groq response empty. Using offline fallback advisory.")
             if action_trigger == 'trigger_image_upload':
                 if language == 'ur':
-                    assistant_message = "میں دیکھ رہا ہوں کہ آپ کی فصل بیمار ہے۔ براہ کرم پتے کی واضح تصویر اپ لوڈ کریں تاکہ میں اپنے اسکینر سے بیماری کی تشخیص کر سکوں۔"
+                    assistant_message = "میں دیکھ رہا ہوں کہ آپ کی فصل بیمار ہے۔ براہ کرم فصل کے متاثرہ حصے (پتے، پھول، پھل، تنا، جڑ، یا پورے پودے) کی واضح تصویر اپ لوڈ کریں تاکہ میں اپنے اسکینر سے بیماری کی تشخیص کر سکوں۔"
                 else:
-                    assistant_message = "It looks like you are dealing with a crop disease. Please upload a clear leaf photo using the scanner form to perform AI disease diagnostics."
+                    assistant_message = "It looks like you are dealing with a crop disease. Please upload a clear photo of the affected crop part (leaf, flower, fruit, stem, root, or whole plant) using the scanner form to perform AI disease diagnostics."
             elif action_trigger == 'trigger_soil_inputs':
                 if language == 'ur':
                     assistant_message = "فصل کی کاشت کے بہترین فیصلے کے لیے، براہ کرم نیچے دیے گئے فارم میں مٹی کے پیرامیٹرز (نائٹروجن، فاسفورس، پوٹاشیم، پی ایچ) درج کریں۔"

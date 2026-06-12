@@ -8,6 +8,10 @@ import { setLang } from '../state.js';
 import { navigate } from '../router.js';
 
 let chatContainer = null;
+let activeStream = null;
+let facingMode = 'environment';
+let capturedBlob = null;
+let videoDevices = [];
 
 export async function mountChat(container) {
   container.innerHTML = '';
@@ -53,32 +57,32 @@ export async function mountChat(container) {
         <div class="chat-welcome-inner">
           <h1 class="welcome-title">Ask CropMind, <span id="welcomeName">User</span></h1>
           <div class="welcome-pill">
-            <button class="pill-btn" type="button" id="welcomeUploadBtn" title="Upload" style="margin-right:8px;"><i class="fas fa-plus"></i></button>
+            <button class="pill-btn" type="button" id="welcomeUploadBtn" title="Open Camera" style="margin-right:8px;"><i class="fas fa-camera"></i></button>
             <input type="text" class="pill-input" id="welcomeInput" placeholder="Ask CropMind...">
             <button class="pill-btn mic-btn" id="welcomeMicBtn" type="button" title="Speak (Urdu/English)" style="margin-right:8px;"><i class="fas fa-microphone"></i></button>
             <div class="welcome-model-pill" style="display:flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(255,255,255,0.06);border-radius:12px;font-size:11px;font-weight:500;color:var(--fg-muted);margin-right:10px;white-space:nowrap;flex-shrink:0;">
-              <span>Llama 3.2 Vision</span> <i class="fas fa-chevron-down" style="font-size:8px;"></i>
+              <span>Gemini 3.5 Flash</span> <i class="fas fa-chevron-down" style="font-size:8px;"></i>
             </div>
           </div>
         </div>
       </div>
-
+ 
       <div class="chat-messages-area" id="chatMessages"></div>
-
+ 
       <div class="chat-input-bar" id="chatInputBar">
         <div class="chat-input-inner" id="chatInputInner" style="position: relative;">
           
           <div class="chat-input-widgets" id="chatInputWidgets" style="display: flex; align-items: center; width: 100%;">
             <input type="file" id="imageUpload" accept="image/*" style="display:none;">
-            <div class="upload-box" id="attachBtn" title="Upload image">
-              <i class="fas fa-cloud-arrow-up"></i>
-              <span class="upload-box-text">Upload</span>
+            <div class="upload-box" id="attachBtn" title="Open Camera">
+              <i class="fas fa-camera"></i>
+              <span class="upload-box-text" id="attachBtnText">Camera</span>
             </div>
             <textarea class="pill-input" id="chatInput" placeholder="Describe your crop issue or ask a question..." rows="1" style="resize: none; max-height: 120px; min-height: 38px; height: 38px; line-height: 1.4; padding: 8px 12px; font-family: inherit; box-sizing: border-box; overflow-y: auto;"></textarea>
             <button class="pill-btn mic-btn" id="micBtn" type="button" title="Speak (Urdu/English)" style="margin-right:4px;"><i class="fas fa-microphone"></i></button>
             <button class="pill-btn" id="sendBtn" type="button" title="Send" style="color:var(--accent);"><i class="fas fa-paper-plane"></i></button>
           </div>
-
+ 
           <div class="recording-widgets-overlay" id="recordingOverlay" style="display: none; align-items: center; justify-content: space-between; width: 100%; position: absolute; left: 0; top: 0; bottom: 0; right: 0; background: var(--bg-elevated); padding: 0 16px; border-radius: inherit; z-index: 10;">
             <div style="display:flex;align-items:center;gap:16px;flex-grow:1;">
               <div class="pulse-dot red-pulse" style="width:10px;height:10px;background:#ef4444;border-radius:50%;flex-shrink:0;"></div>
@@ -92,7 +96,41 @@ export async function mountChat(container) {
               <button class="record-action-btn stop" id="stopRecordBtn" type="button" title="Stop and Transcribe"><i class="fas fa-circle-stop"></i></button>
             </div>
           </div>
+ 
+        </div>
+      </div>
+    </div>
 
+    <!-- Camera Modal -->
+    <div id="cameraModal" class="camera-modal" style="display:none;">
+      <div class="camera-modal-content">
+        <div class="camera-header">
+          <h3><i class="fas fa-camera"></i> <span id="cameraTitleText">CropMind Camera</span></h3>
+          <button class="camera-close-btn" id="cameraCloseBtn" type="button" title="Close"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="camera-view-container">
+          <video id="cameraVideo" autoplay playsinline></video>
+          <img id="cameraPreviewImage" style="display:none;" />
+          <div class="camera-grid-overlay"></div>
+        </div>
+        <div class="camera-footer">
+          <!-- Controls when streaming -->
+          <div class="camera-controls-stream" id="cameraControlsStream">
+            <button class="camera-action-btn" id="cameraFallbackUploadBtn" type="button" title="Upload from Device">
+              <i class="fas fa-folder-open"></i>
+            </button>
+            <button class="camera-capture-btn" id="cameraCaptureBtn" type="button" title="Capture Photo">
+              <span class="camera-capture-btn-inner"></span>
+            </button>
+            <button class="camera-action-btn" id="cameraSwitchBtn" type="button" title="Switch Camera">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+          <!-- Controls when previewing -->
+          <div class="camera-controls-preview" id="cameraControlsPreview" style="display:none;">
+            <button class="btn btn-outline" id="cameraRetakeBtn" type="button" style="padding: 8px 16px;"><i class="fas fa-redo"></i> <span id="cameraRetakeText">Retake</span></button>
+            <button class="btn btn-accent" id="cameraSendBtn" type="button" style="padding: 8px 16px;"><i class="fas fa-paper-plane"></i> <span id="cameraSendText">Send & Scan</span></button>
+          </div>
         </div>
       </div>
     </div>
@@ -148,14 +186,25 @@ export async function mountChat(container) {
     if (e.key === 'Enter') submitWelcomeChat();
   });
   container.querySelector('#welcomeUploadBtn').addEventListener('click', () => {
-    container.querySelector('#imageUpload').click();
+    openCamera();
   });
 
   // Image upload
   container.querySelector('#attachBtn').addEventListener('click', () => {
-    container.querySelector('#imageUpload').click();
+    openCamera();
   });
   container.querySelector('#imageUpload').addEventListener('change', handleImageUpload);
+
+  // Camera Modal listeners
+  container.querySelector('#cameraCloseBtn').addEventListener('click', closeCamera);
+  container.querySelector('#cameraCaptureBtn').addEventListener('click', capturePhoto);
+  container.querySelector('#cameraSwitchBtn').addEventListener('click', switchCamera);
+  container.querySelector('#cameraRetakeBtn').addEventListener('click', retakePhoto);
+  container.querySelector('#cameraSendBtn').addEventListener('click', sendCapturedPhoto);
+  container.querySelector('#cameraFallbackUploadBtn').addEventListener('click', () => {
+    container.querySelector('#imageUpload').click();
+    closeCamera();
+  });
 
   // Voice recording events
   container.querySelector('#micBtn').addEventListener('click', startRecording);
@@ -171,6 +220,10 @@ export async function mountChat(container) {
   populateChatHistory();
 
   return () => {
+    if (activeStream) {
+      activeStream.getTracks().forEach(track => track.stop());
+      activeStream = null;
+    }
     container.classList.remove('chat-page');
     chatContainer = null;
   };
@@ -387,14 +440,36 @@ function chatOptionClicked(opt) {
       setTimeout(() => {
         removeTyping();
         addBotHTML((isEn
-          ? 'Upload a clear photo of the affected crop — leaves, stem, or whole plant.'
-          : 'متاثرہ فصل کی واضح تصویر اپ لوڈ کریں۔') + `
-          <div class="upload-zone" onclick="document.getElementById('imageUpload').click()">
-            <i class="fas fa-cloud-arrow-up" style="font-size:24px;color:var(--fg-muted);margin-bottom:6px;display:block;"></i>
-            <div style="font-size:12px;color:var(--fg-muted);">Click to upload or drag image</div>
-            <div style="font-size:10px;color:var(--fg-muted);margin-top:4px;">JPG, PNG up to 10MB</div>
+          ? 'Take a clear photo of the affected crop (leaf, flower, fruit, stem, root, or whole plant) or upload a photo.'
+          : 'متاثرہ فصل (پتے، پھول، پھل، تنا، جڑ یا پورے پودے) کی واضح تصویر لیں یا تصویر اپ لوڈ کریں۔') + `
+          <div class="upload-zone" id="welcomeUploadZone">
+            <i class="fas fa-camera" style="font-size:24px;color:var(--fg-muted);margin-bottom:6px;display:block;"></i>
+            <div style="font-size:12px;color:var(--fg-muted);font-weight:600;">${isEn ? 'Click to open Camera & Scan' : 'کیمرہ کھولنے اور سکین کرنے کے لیے کلک کریں'}</div>
+            <div style="font-size:10px;color:var(--fg-muted);margin-top:6px;">
+              ${isEn ? 'or click' : 'یا'} <span style="text-decoration:underline;color:var(--accent);cursor:pointer;" id="welcomeFileFallback">${isEn ? 'here to upload a file' : 'فائل اپ لوڈ کرنے کے لیے یہاں کلک کریں'}</span>
+            </div>
           </div>
         `);
+
+        // Attach listeners to inline elements
+        setTimeout(() => {
+          const zone = chatContainer.querySelector('#welcomeUploadZone');
+          const fallback = chatContainer.querySelector('#welcomeFileFallback');
+          if (zone) {
+            zone.addEventListener('click', (e) => {
+              if (e.target === fallback || fallback.contains(e.target)) {
+                return;
+              }
+              openCamera();
+            });
+          }
+          if (fallback) {
+            fallback.addEventListener('click', (e) => {
+              e.stopPropagation();
+              chatContainer.querySelector('#imageUpload').click();
+            });
+          }
+        }, 50);
       }, 800);
     }, 200);
   } else if (opt === 'soil') {
@@ -520,7 +595,7 @@ async function sendMessage() {
     populateChatHistory();
 
     if (result.data.action_trigger === 'trigger_image_upload') {
-      setTimeout(() => chatContainer.querySelector('#imageUpload').click(), 1000);
+      setTimeout(() => openCamera(), 1000);
     } else if (result.data.action_trigger === 'trigger_soil_inputs') {
       setTimeout(() => renderCropRecommendForm(), 1000);
     }
@@ -1254,6 +1329,28 @@ function switchLangChat(lang) {
   const welcomeInput = chatContainer.querySelector('#welcomeInput');
   if (welcomeInput) welcomeInput.placeholder = lang === 'ur' ? 'کراپ مائنڈ سے پوچھیں...' : 'Ask CropMind...';
 
+  // Translate camera button tooltips & texts
+  const attachBtnText = chatContainer.querySelector('#attachBtnText');
+  if (attachBtnText) attachBtnText.textContent = lang === 'ur' ? 'کیمرہ' : 'Camera';
+  const welcomeUploadBtn = chatContainer.querySelector('#welcomeUploadBtn');
+  if (welcomeUploadBtn) welcomeUploadBtn.title = lang === 'ur' ? 'کیمرہ کھولیں' : 'Open Camera';
+  const attachBtn = chatContainer.querySelector('#attachBtn');
+  if (attachBtn) attachBtn.title = lang === 'ur' ? 'کیمرہ کھولیں' : 'Open Camera';
+
+  // Translate Camera Modal
+  const cameraTitleText = chatContainer.querySelector('#cameraTitleText');
+  if (cameraTitleText) cameraTitleText.textContent = lang === 'ur' ? 'کراپ مائنڈ کیمرہ' : 'CropMind Camera';
+  const cameraRetakeText = chatContainer.querySelector('#cameraRetakeText');
+  if (cameraRetakeText) cameraRetakeText.textContent = lang === 'ur' ? 'دوبارہ لیں' : 'Retake';
+  const cameraSendText = chatContainer.querySelector('#cameraSendText');
+  if (cameraSendText) cameraSendText.textContent = lang === 'ur' ? 'بھیجیں اور سکین' : 'Send & Scan';
+  const cameraFallbackUploadBtn = chatContainer.querySelector('#cameraFallbackUploadBtn');
+  if (cameraFallbackUploadBtn) cameraFallbackUploadBtn.title = lang === 'ur' ? 'فائل اپ لوڈ کریں' : 'Upload from Device';
+  const cameraCaptureBtn = chatContainer.querySelector('#cameraCaptureBtn');
+  if (cameraCaptureBtn) cameraCaptureBtn.title = lang === 'ur' ? 'تصویر کھینچیں' : 'Capture Photo';
+  const cameraSwitchBtn = chatContainer.querySelector('#cameraSwitchBtn');
+  if (cameraSwitchBtn) cameraSwitchBtn.title = lang === 'ur' ? 'کیمرہ تبدیل کریں' : 'Switch Camera';
+
   // Force sidebar update
   const sidebar = document.getElementById('appSidebar');
   if (sidebar) {
@@ -1358,3 +1455,202 @@ window.__assessWholesaleDealInCopilot = async function(item) {
       : "Sorry, I was unable to evaluate this B2B deal at the moment. Please try again.");
   }
 };
+
+// ====== CAMERA CAPTURE FUNCTIONALITY ======
+async function openCamera() {
+  const isEn = getState().currentLang === 'en';
+  const modal = chatContainer.querySelector('#cameraModal');
+  if (!modal) return;
+
+  // Show the modal
+  modal.style.display = 'flex';
+
+  // Clear any existing preview state
+  capturedBlob = null;
+  const previewImg = chatContainer.querySelector('#cameraPreviewImage');
+  if (previewImg) {
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+  }
+  const videoEl = chatContainer.querySelector('#cameraVideo');
+  if (videoEl) videoEl.style.display = 'block';
+
+  // Show stream controls, hide preview controls
+  const streamCtrl = chatContainer.querySelector('#cameraControlsStream');
+  const previewCtrl = chatContainer.querySelector('#cameraControlsPreview');
+  if (streamCtrl) streamCtrl.style.display = 'flex';
+  if (previewCtrl) previewCtrl.style.display = 'none';
+
+  await startStream();
+}
+
+async function startStream() {
+  const isEn = getState().currentLang === 'en';
+  const videoEl = chatContainer.querySelector('#cameraVideo');
+  if (!videoEl) return;
+
+  if (activeStream) {
+    activeStream.getTracks().forEach(track => track.stop());
+    activeStream = null;
+  }
+
+  try {
+    const constraints = {
+      video: {
+        facingMode: facingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    };
+
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    videoEl.srcObject = stream;
+    activeStream = stream;
+
+    // Apply mirror view if we are using the user-facing (front) camera
+    const track = stream.getVideoTracks()[0];
+    const settings = track.getSettings ? track.getSettings() : {};
+    const isFront = settings.facingMode === 'user' || (track.label && track.label.toLowerCase().includes('front'));
+    
+    if (isFront) {
+      videoEl.classList.add('mirror');
+    } else {
+      videoEl.classList.remove('mirror');
+    }
+
+    // Check if we can switch camera (more than one video input)
+    if (navigator.mediaDevices.enumerateDevices) {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      videoDevices = devices.filter(d => d.kind === 'videoinput');
+      const switchBtn = chatContainer.querySelector('#cameraSwitchBtn');
+      if (switchBtn) {
+        switchBtn.style.display = videoDevices.length > 1 ? 'flex' : 'none';
+      }
+    }
+  } catch (err) {
+    console.error('Error accessing camera:', err);
+    showToast(isEn ? 'Camera not accessible. Opening file upload instead.' : 'کیمرہ دستیاب نہیں ہے۔ فائل اپ لوڈ کھل رہا ہے۔');
+    closeCamera();
+    chatContainer.querySelector('#imageUpload').click();
+  }
+}
+
+function closeCamera() {
+  if (activeStream) {
+    activeStream.getTracks().forEach(track => track.stop());
+    activeStream = null;
+  }
+  const modal = chatContainer?.querySelector('#cameraModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function switchCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  startStream();
+}
+
+function capturePhoto() {
+  const videoEl = chatContainer.querySelector('#cameraVideo');
+  if (!videoEl || !activeStream) return;
+
+  // Pause video preview
+  videoEl.pause();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = videoEl.videoWidth || 640;
+  canvas.height = videoEl.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+
+  // Handle mirroring when drawing to canvas if video is mirrored
+  if (videoEl.classList.contains('mirror')) {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+
+  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob((blob) => {
+    capturedBlob = blob;
+    
+    // Stop camera stream to free up system resource
+    if (activeStream) {
+      activeStream.getTracks().forEach(track => track.stop());
+      activeStream = null;
+    }
+
+    // Show preview image
+    const previewImg = chatContainer.querySelector('#cameraPreviewImage');
+    if (previewImg) {
+      previewImg.src = URL.createObjectURL(blob);
+      previewImg.style.display = 'block';
+    }
+    videoEl.style.display = 'none';
+
+    // Show preview controls, hide stream controls
+    const streamCtrl = chatContainer.querySelector('#cameraControlsStream');
+    const previewCtrl = chatContainer.querySelector('#cameraControlsPreview');
+    if (streamCtrl) streamCtrl.style.display = 'none';
+    if (previewCtrl) previewCtrl.style.display = 'flex';
+  }, 'image/jpeg', 0.95);
+}
+
+function retakePhoto() {
+  const videoEl = chatContainer.querySelector('#cameraVideo');
+  const previewImg = chatContainer.querySelector('#cameraPreviewImage');
+  
+  if (previewImg) {
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+  }
+  if (videoEl) {
+    videoEl.style.display = 'block';
+    videoEl.play();
+  }
+
+  // Switch controls back
+  const streamCtrl = chatContainer.querySelector('#cameraControlsStream');
+  const previewCtrl = chatContainer.querySelector('#cameraControlsPreview');
+  if (streamCtrl) streamCtrl.style.display = 'flex';
+  if (previewCtrl) previewCtrl.style.display = 'none';
+
+  capturedBlob = null;
+  startStream();
+}
+
+async function sendCapturedPhoto() {
+  if (!capturedBlob) return;
+
+  const blob = capturedBlob;
+  closeCamera();
+
+  activateChat();
+  const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+  const preview = URL.createObjectURL(file);
+  addUserMessage(preview, 'image');
+
+  const state = getState();
+  if (!state.activeChatSessionId) setState({ activeChatSessionId: generateUUID() });
+
+  const form = new FormData();
+  form.append('image', file);
+  form.append('lang', state.currentLang);
+  form.append('chat_session_id', state.activeChatSessionId);
+  form.append('region', state.user?.region || 'Punjab');
+
+  addTyping();
+  const result = await apiScanImage(form);
+  removeTyping();
+
+  if (result && result.status === 'success' && result.data) {
+    const isEn = state.currentLang === 'en';
+    if (result.data.assistant_message) {
+      addBotMessage(result.data.assistant_message);
+    } else {
+      addBotMessage(isEn ? 'Analysis complete — here are the results.' : 'تجزیہ مکمل — نتائج:');
+    }
+    showResultCard(result.data);
+    populateChatHistory();
+  }
+}
+

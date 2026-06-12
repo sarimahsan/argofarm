@@ -19,9 +19,9 @@ scan_bp = Blueprint('scan', __name__, url_prefix='/api/v1/scan')
 @rate_limit(limit=3, period=60)
 @rate_limit(limit=10, period=86400)
 def predict(payload):
-    """Handle image upload, run Gemini 2.5 Flash Vision model, save scan, and return B2B diagnosis result"""
+    """Handle image upload, run Gemini 3.5 Flash Vision model, save scan, and return B2B diagnosis result"""
     user_id = payload.get('user_id')
-    logger.info(f"=== Starting Gemini 2.5 Flash Vision disease prediction for user {user_id} ===")
+    logger.info(f"=== Starting Gemini 3.5 Flash Vision disease prediction for user {user_id} ===")
 
     if 'image' not in request.files:
         logger.warning("No image file provided in request")
@@ -58,8 +58,8 @@ def predict(payload):
         if lang == 'ur':
             system_prompt = (
                 "You are 'Dr. Crop AI', an expert crop pathologist in Pakistan.\n"
-                "Analyze the leaf image and identify the crop and disease. Return ONLY a valid JSON object.\n"
-                "CRITICAL: If the image does not show a plant or leaf clearly, or if it is too blurry/unclear to identify the crop and pathology, you MUST return:\n"
+                "Analyze the crop image (which can be a leaf, flower, fruit, stem, root, or whole plant) and identify the crop and disease. Return ONLY a valid JSON object.\n"
+                "CRITICAL: If the image does not show a plant or crop part clearly, or if it is too blurry/unclear to identify the crop and pathology, you MUST return:\n"
                 "{\n"
                 "  \"crop_type\": \"Unknown\",\n"
                 "  \"disease\": \"Invalid Image\",\n"
@@ -83,8 +83,8 @@ def predict(payload):
         else:
             system_prompt = (
                 "You are 'Dr. Crop AI', an expert crop pathologist in Pakistan.\n"
-                "Analyze the leaf image and identify the crop and disease. Return ONLY a valid JSON object.\n"
-                "CRITICAL: If the image does not show a plant or leaf clearly, or if it is too blurry/unclear to identify the crop and pathology, you MUST return:\n"
+                "Analyze the crop image (which can be a leaf, flower, fruit, stem, root, or whole plant) and identify the crop and disease. Return ONLY a valid JSON object.\n"
+                "CRITICAL: If the image does not show a plant or crop part clearly, or if it is too blurry/unclear to identify the crop and pathology, you MUST return:\n"
                 "{\n"
                 "  \"crop_type\": \"Unknown\",\n"
                 "  \"disease\": \"Invalid Image\",\n"
@@ -107,10 +107,10 @@ def predict(payload):
             )
 
         user_prompt = (
-            f"Analyze leaf image for '{crop_type}' from '{region}'. Return ONLY JSON."
+            f"Analyze crop image for '{crop_type}' from '{region}'. Return ONLY JSON."
         )
 
-        logger.info("Dispatching image to Gemini Vision API (gemini-2.5-flash)...")
+        logger.info("Dispatching image to Gemini Vision API (gemini-3.5-flash)...")
         gemini_resp = None
         try:
             gemini_resp = call_gemini_vision(
@@ -164,7 +164,7 @@ def predict(payload):
                     
                     # Check raw Groq response for invalid/non-plant/blurry indicators
                     resp_lower = groq_resp.lower()
-                    if any(kw in resp_lower for kw in ["no plant", "invalid image", "no leaf", "blurry", "unclear", "not a plant", "not plant"]):
+                    if any(kw in resp_lower for kw in ["no plant", "invalid image", "blurry", "unclear", "not a plant", "not plant"]):
                         logger.warning("Recommending rejection based on raw Groq response keywords after JSON parse failure.")
                         error_msg = "Please upload a clear picture or a picture of a plant."
                         if lang == 'ur':
@@ -207,7 +207,7 @@ def predict(payload):
                 # If both failed, check raw Gemini response for rejection before resorting to offline fallback
                 if gemini_resp:
                     resp_lower = gemini_resp.lower()
-                    if any(kw in resp_lower for kw in ["no plant", "invalid image", "no leaf", "blurry", "unclear", "not a plant", "not plant"]):
+                    if any(kw in resp_lower for kw in ["no plant", "invalid image", "blurry", "unclear", "not a plant", "not plant"]):
                         logger.warning("Recommending rejection based on raw Gemini response keywords after both parsed and Groq failed.")
                         error_msg = "Please upload a clear picture or a picture of a plant."
                         if lang == 'ur':
@@ -288,7 +288,7 @@ def predict(payload):
                 advisory_text = str(advisory_text)
             
             # Check for low confidence or non-plant image rejection
-            if confidence < 50.0 or status.lower() == 'invalid' or 'invalid' in disease.lower() or 'clear' in advisory_text.lower() or 'پودے' in advisory_text:
+            if confidence < 50.0 or status.lower() == 'invalid' or 'invalid' in disease.lower():
                 logger.warning(f"Scan validation rejected with low confidence={confidence}%, status={status}")
                 error_msg = "Please upload a clear picture or a picture of a plant."
                 if lang == 'ur':
@@ -340,35 +340,16 @@ def predict(payload):
 
 
 
-        # Robust agronomist diagnostic fallback if Gemini Vision fails
+        # Both Gemini and Groq Vision failed
         if not parsed:
-            logger.warning("Gemini Vision or JSON parsing failed. Executing offline python B2B agronomist fallback...")
-            confidence = 75.0
-            status = 'Diseased'
-            if crop_type.lower() == 'wheat':
-                disease = 'Wheat Rust (پیلی کنگی)'
-                advisory_en = 'Yellow/brown rust pustules detected on leaf surfaces. Apply recommended fungicide sprays like Tebuconazole (250 ml/acre) and avoid excess nitrogen fertilization.'
-                advisory_ur = 'پتوں کی سطح پر زرد یا بھورے دھبے دیکھے گئے۔ تجویز کردہ فنجی سائیڈ جیسے ٹیبوکونازول (250 ملی لیٹر فی ایکڑ) کا سپرے کریں اور نائٹروجن کھاد کا زیادہ استعمال نہ کریں۔'
-            elif crop_type.lower() == 'rice':
-                disease = 'Rice Blast (دھان کا بلاسٹ)'
-                advisory_en = 'Spindle-shaped spots with grey centers observed. Spray Tricyclazole or Kasugamycin and ensure optimal water leveling to check moisture-related spreads.'
-                advisory_ur = 'سلیٹی رنگ کے درمیانی حصوں والے تکلے کے سائز کے دھبے دیکھے گئے۔ ٹرائی سائیکلازول یا کاسوگامائسن کا سپرے کریں اور پانی کی متوازن لیولنگ یقینی بنائیں۔'
-            elif crop_type.lower() == 'potato':
-                disease = 'Potato Early Blight (آلو کا جھلساؤ)'
-                advisory_en = 'Concentric dark brown target spots on older leaves. Spray Mancozeb (800g/acre) or Chlorothalonil and maintain healthy crop spacing.'
-                advisory_ur = 'پرانے پتوں پر گول گہرے بھورے ہدف والے دھبے دیکھے گئے۔ مینکوزیب (800 گرام فی ایکڑ) یا کلوروتھالونل کا سپرے کریں اور پودوں کا درمیانی فاصلہ برقرار رکھیں۔'
-            else:
-                disease = 'Generic Leaf Spot (پتوں کے دھبے)'
-                advisory_en = 'Generic fungal leaf spots identified. Apply organic copper sprays or systemic fungicides to prevent spore dissemination.'
-                advisory_ur = 'عام فنگل پتوں کے دھبے پائے گئے۔ اسپورز کے پھیلاؤ کو روکنے کے لیے آرگینک کاپر سپرے یا سسٹمک فنجی سائیڈز کا استعمال کریں۔'
-            
-            advisory_text = advisory_ur if lang == 'ur' else advisory_en
+            logger.error("❌ Both Gemini Vision and Groq Vision APIs failed or returned unparseable output.")
+            error_msg = "AI diagnostics services are temporarily unavailable. Please try again later."
             if lang == 'ur':
-                advisory_en = "No English advisory details available."
-                advisory_ur = advisory_text
-            else:
-                advisory_en = advisory_text
-                advisory_ur = "کوئی اردو مشورہ دستیاب نہیں ہے۔"
+                error_msg = "اے آئی تشخیصی خدمات عارضی طور پر دستیاب نہیں ہیں۔ براہ کرم بعد میں دوبارہ کوشش کریں۔"
+            return jsonify({
+                'status': 'error',
+                'message': error_msg
+            }), 503
 
         # Store scan record in database
         logger.info(f"Storing scan record in database: disease={disease}, confidence={confidence}%, status={status}")
